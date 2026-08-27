@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { stat } from 'node:fs/promises';
 
-import { createPiDocumentAgent } from './agent/piDocumentAgent.js';
+import { createPiDocumentAgent } from './agent/piAgent.js';
 import type { DocumentAgent } from './agent/documentAgent.js';
 import { InkAgentError } from './errors.js';
 import { extractInputFiles, type ExtractRecord } from './ingest/extract.js';

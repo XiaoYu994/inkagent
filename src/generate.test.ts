@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { createStubDocumentAgent } from './agent/stubDocumentAgent.js';
+import { createStubDocumentAgent } from './agent/stubAgent.js';
 import { generateDocument } from './generate.js';
 import { InkAgentError } from './errors.js';
 import { createPdfWithText } from './ingest/officeFixtures.js';

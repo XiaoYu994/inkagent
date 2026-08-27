@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile, cp } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 import { formatError } from '../errors.js';
-import { convertDocumentToMarkdown } from './extractAnydoc.js';
+import { convertDocumentToMarkdown } from './anydoc.js';
 import { detectSourceKind, isAnydocKind, type SourceKind } from './sourceKind.js';
 
 export type ExtractStatus = 'ok' | 'unsupported' | 'error';

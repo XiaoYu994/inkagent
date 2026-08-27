@@ -2,10 +2,8 @@ import { mkdir, readFile, writeFile, cp } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 import { formatError } from '../errors.js';
-import { detectSourceKind, type SourceKind } from './sourceKind.js';
-import { extractDocxText } from './extractDocx.js';
-import { extractPdfText } from './extractPdf.js';
-import { extractPptxText } from './extractPptx.js';
+import { convertDocumentToMarkdown } from './extractAnydoc.js';
+import { detectSourceKind, isPassthroughKind, type SourceKind } from './sourceKind.js';
 
 export type ExtractStatus = 'ok' | 'unsupported' | 'error';
 
@@ -55,7 +53,9 @@ async function extractOneFile(
   }
 
   try {
-    const text = await extractTextForKind(kind, absoluteSource);
+    const text = isPassthroughKind(kind)
+      ? (await readFile(absoluteSource, 'utf8')).trim()
+      : await convertDocumentToMarkdown(absoluteSource);
     const extractPath = `${sourcePath}.md`;
     const destination = join(extractDir, extractPath);
     await mkdir(dirname(destination), { recursive: true });
@@ -70,22 +70,4 @@ async function extractOneFile(
       errorMessage: `抽取失败 ${sourcePath}: ${formatError(error)}`,
     };
   }
-}
-
-async function extractTextForKind(
-  kind: Exclude<SourceKind, 'unsupported' | 'image'>,
-  absoluteSource: string,
-) {
-  if (kind === 'markdown' || kind === 'plain-text' || kind === 'html') {
-    return (await readFile(absoluteSource, 'utf8')).trim();
-  }
-
-  const bytes = new Uint8Array(await readFile(absoluteSource));
-  if (kind === 'pdf') {
-    return extractPdfText(bytes);
-  }
-  if (kind === 'docx') {
-    return extractDocxText(bytes);
-  }
-  return extractPptxText(bytes);
 }

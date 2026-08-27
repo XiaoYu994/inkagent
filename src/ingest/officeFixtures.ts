@@ -57,18 +57,6 @@ export async function createDocxWithText(text: string): Promise<Buffer> {
   return zip.generateAsync({ type: 'nodebuffer' });
 }
 
-export async function createPptxWithText(text: string): Promise<Buffer> {
-  const zip = new JSZip();
-  zip.file(
-    'ppt/slides/slide1.xml',
-    `<?xml version="1.0" encoding="UTF-8"?>
-<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
-  <p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>${escapeXml(text)}</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld>
-</p:sld>`,
-  );
-  return zip.generateAsync({ type: 'nodebuffer' });
-}
-
 function escapeXml(text: string): string {
   return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }

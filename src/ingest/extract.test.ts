@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { extractInputFiles } from './extract.js';
-import { createDocxWithText, createPdfWithText, createPptxWithText } from './officeFixtures.js';
+import { createDocxWithText, createPdfWithText } from './officeFixtures.js';
 
 describe('extractInputFiles', () => {
   it('copies markdown text into extract markdown', async () => {
@@ -38,14 +38,14 @@ describe('extractInputFiles', () => {
     expect(await readFile(join(extractDir, 'a.docx.md'), 'utf8')).toContain('Hello Docx');
   });
 
-  it('extracts text from a pptx', async () => {
+  it('extracts a csv table through anydoc', async () => {
     const { inputDir, extractDir } = await createDirs();
-    await writeFile(join(inputDir, 'a.pptx'), await createPptxWithText('Hello Pptx'));
+    await writeFile(join(inputDir, 'a.csv'), 'name,age\nAda,1\n');
 
-    const records = await extractInputFiles(inputDir, extractDir, ['a.pptx']);
+    const records = await extractInputFiles(inputDir, extractDir, ['a.csv']);
 
     expect(records[0]?.status).toBe('ok');
-    expect(await readFile(join(extractDir, 'a.pptx.md'), 'utf8')).toContain('Hello Pptx');
+    expect(await readFile(join(extractDir, 'a.csv.md'), 'utf8')).toMatch(/Ada/);
   });
 
   it('marks unknown types as unsupported', async () => {

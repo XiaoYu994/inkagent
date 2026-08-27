@@ -27,4 +27,4 @@ npm run build
 node dist/cli.js generate --in ./uploads --out ./output "根据这些材料写一份技术方案"
 ```
 
-`--in` 支持 `.md` `.txt` `.html` `.pdf` `.docx` `.pptx` 与常见图片。任务过程文件写在 `.inkagent/jobs/`（可用 `--work-dir` 覆盖）。
+`--in` 支持 Markdown / 纯文本 / HTML / 常见图片，以及 anydoc 能转成 Markdown 的办公格式（PDF、Word、PPT、Excel、OpenDocument、RTF、EPUB、CSV 等）。任务过程文件写在 `.inkagent/jobs/`（可用 `--work-dir` 覆盖）。扫描件 PDF 需要 OCR，第一版不覆盖。

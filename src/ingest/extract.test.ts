@@ -15,7 +15,7 @@ describe('extractInputFiles', () => {
     const records = await extractInputFiles(inputDir, extractDir, ['notes.md']);
 
     expect(records[0]?.status).toBe('ok');
-    expect(await readFile(join(extractDir, 'notes.md.md'), 'utf8')).toContain('body');
+    expect(await readFile(join(extractDir, 'markdown', 'notes.md'), 'utf8')).toContain('body');
   });
 
   it('extracts text from a pdf', async () => {
@@ -25,7 +25,7 @@ describe('extractInputFiles', () => {
     const records = await extractInputFiles(inputDir, extractDir, ['a.pdf']);
 
     expect(records[0]?.status).toBe('ok');
-    expect(await readFile(join(extractDir, 'a.pdf.md'), 'utf8')).toContain('Hello PDF');
+    expect(await readFile(join(extractDir, 'pdf', 'a.pdf.md'), 'utf8')).toContain('Hello PDF');
   });
 
   it('extracts text from a docx', async () => {
@@ -35,7 +35,7 @@ describe('extractInputFiles', () => {
     const records = await extractInputFiles(inputDir, extractDir, ['a.docx']);
 
     expect(records[0]?.status).toBe('ok');
-    expect(await readFile(join(extractDir, 'a.docx.md'), 'utf8')).toContain('Hello Docx');
+    expect(await readFile(join(extractDir, 'docx', 'a.docx.md'), 'utf8')).toContain('Hello Docx');
   });
 
   it('extracts a csv table through anydoc', async () => {
@@ -45,7 +45,7 @@ describe('extractInputFiles', () => {
     const records = await extractInputFiles(inputDir, extractDir, ['a.csv']);
 
     expect(records[0]?.status).toBe('ok');
-    expect(await readFile(join(extractDir, 'a.csv.md'), 'utf8')).toMatch(/Ada/);
+    expect(await readFile(join(extractDir, 'csv', 'a.csv.md'), 'utf8')).toMatch(/Ada/);
   });
 
   it('copies an image through unchanged and marks the record ok', async () => {
@@ -55,8 +55,12 @@ describe('extractInputFiles', () => {
 
     const records = await extractInputFiles(inputDir, extractDir, ['logo.png']);
 
-    expect(records[0]).toMatchObject({ status: 'ok', kind: 'image', extractPath: 'logo.png' });
-    expect(await readFile(join(extractDir, 'logo.png'))).toEqual(png);
+    expect(records[0]).toMatchObject({
+      status: 'ok',
+      kind: 'image',
+      extractPath: 'image/logo.png',
+    });
+    expect(await readFile(join(extractDir, 'image', 'logo.png'))).toEqual(png);
   });
 
   it('marks unknown types as unsupported', async () => {

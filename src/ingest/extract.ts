@@ -29,10 +29,11 @@ export async function extractInputFiles(
 
 async function copyImage(
   extractDir: string,
+  kind: SourceKind,
   sourcePath: string,
   absoluteSource: string,
 ): Promise<ExtractRecord> {
-  const extractPath = sourcePath;
+  const extractPath = `${kind}/${sourcePath}`;
   const destination = join(extractDir, extractPath);
 
   try {
@@ -69,14 +70,16 @@ async function extractOneFile(
   }
 
   if (kind === 'image') {
-    return copyImage(extractDir, sourcePath, absoluteSource);
+    return copyImage(extractDir, kind, sourcePath, absoluteSource);
   }
 
   try {
     const text = isAnydocKind(kind)
       ? await convertDocumentToMarkdown(absoluteSource)
       : (await readFile(absoluteSource, 'utf8')).trim();
-    const extractPath = `${sourcePath}.md`;
+    // 原名保留在路径里，材料出处可追溯；kind 子目录避免抽取产物与原文混杂。
+    const mdSuffix = sourcePath.endsWith('.md') ? '' : '.md';
+    const extractPath = `${kind}/${sourcePath}${mdSuffix}`;
     const destination = join(extractDir, extractPath);
     await mkdir(dirname(destination), { recursive: true });
     await writeFile(destination, `${text}\n`, 'utf8');

@@ -62,7 +62,6 @@ export async function generateDocument(
 }
 
 async function writeManifest(workspace: JobWorkspace, extracts: ExtractRecord[]): Promise<void> {
-  await writeJsonFile(join(workspace.extractDir, 'files.json'), extracts);
   await writeJsonFile(workspace.manifestPath, {
     jobId: workspace.jobId,
     extracts,

@@ -9,6 +9,10 @@ import { generateDocument } from './generate.js';
 import { InkAgentError } from './errors.js';
 import { createPdfWithText } from './ingest/officeFixtures.js';
 
+function readJson(path: string): Promise<unknown> {
+  return readFile(path, 'utf8').then(JSON.parse);
+}
+
 describe('generateDocument', () => {
   it('extracts inputs and copies stub markdown to the output directory', async () => {
     const root = await mkdtemp(join(tmpdir(), 'inkagent-gen-'));
@@ -30,6 +34,15 @@ describe('generateDocument', () => {
     expect(result.outputFiles).toContain('document.md');
     expect(await readFile(join(outputDir, 'document.md'), 'utf8')).toContain('已生成');
     expect(result.extracts.filter((record) => record.status === 'ok')).toHaveLength(2);
+    expect(result.extracts.map((record) => record.extractPath)).toEqual([
+      'markdown/notes.md',
+      'pdf/spec.pdf.md',
+    ]);
+
+    const manifest = (await readJson(join(result.jobDir, 'manifest.json'))) as {
+      extracts: unknown[];
+    };
+    expect(manifest.extracts).toHaveLength(2);
   });
 
   it('throws when every input file is unsupported', async () => {

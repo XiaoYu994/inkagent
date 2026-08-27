@@ -5,9 +5,8 @@ import { createPiDocumentAgent } from './agent/piDocumentAgent.js';
 import type { DocumentAgent } from './agent/documentAgent.js';
 import { InkAgentError } from './errors.js';
 import { extractInputFiles, type ExtractRecord } from './ingest/extract.js';
+import { copyInputTree, copyOutputTree } from './job/copyTree.js';
 import {
-  copyInputTree,
-  copyOutputTree,
   createJobWorkspace,
   writeBrief,
   writeJsonFile,

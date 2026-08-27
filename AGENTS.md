@@ -58,11 +58,12 @@
 
 ## 构建与测试
 
-- 安装：`npm install`（Node.js 22+）
+- 安装：`npm install`（Node.js 22.13+）
 - 类型检查：`npm run typecheck`
 - 测试：`npm test`
 - 构建：`npm run build`
-- 检查风格：`npm run lint`
+- 检查风格：`npm run lint` 与 `npm run format:check`
+- CI：`.github/workflows/ci.yml` 在 `main` 与 PR 上跑上述命令
 
 ## 完成标准
 

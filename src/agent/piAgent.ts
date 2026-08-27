@@ -38,15 +38,16 @@ async function runPiDocumentSession(jobDir: string, selection: PiModelSelection 
     throw new InkAgentError('没有可用的模型。请先配置 Pi 的 API 密钥，或运行 `pi auth`。');
   }
 
-  // 真实用户全局设置兜底默认模型与 thinking；扩展、技能等仍由隔离的 loader 屏蔽。
-  const settingsManager = SettingsManager.create(jobDir, getAgentDir());
+  // 真实用户全局设置仅提供模型/thinking 等运行偏好。
+  const userSettings = SettingsManager.create(jobDir, getAgentDir());
   const explicitModel = resolveExplicitModel(modelRuntime, selection?.model);
 
+  // 资源发现层用干净设置：避免把用户 packages/extensions 拉进任务沙箱。
   const agentDir = join(jobDir, '.pi-home');
   const loader = new DefaultResourceLoader({
     cwd: jobDir,
     agentDir,
-    settingsManager,
+    settingsManager: SettingsManager.inMemory({}),
     noExtensions: true,
     noSkills: true,
     noPromptTemplates: true,
@@ -59,7 +60,7 @@ async function runPiDocumentSession(jobDir: string, selection: PiModelSelection 
   const thinkingLevel =
     selection?.thinkingLevel ??
     explicitModel.thinkingLevel ??
-    (settingsManager.getGlobalSettings().defaultThinkingLevel as ThinkingLevel | undefined);
+    (userSettings.getGlobalSettings().defaultThinkingLevel as ThinkingLevel | undefined);
 
   const { session } = await createAgentSession({
     cwd: jobDir,
@@ -68,7 +69,7 @@ async function runPiDocumentSession(jobDir: string, selection: PiModelSelection 
     tools: ['read', 'write', 'edit', 'grep', 'find', 'ls'],
     resourceLoader: loader,
     sessionManager: SessionManager.create(jobDir, join(jobDir, 'sessions')),
-    settingsManager,
+    settingsManager: userSettings,
     ...(explicitModel.model === undefined ? {} : { model: explicitModel.model }),
     ...(thinkingLevel === undefined ? {} : { thinkingLevel }),
   });

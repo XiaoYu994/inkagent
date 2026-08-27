@@ -48,6 +48,17 @@ describe('extractInputFiles', () => {
     expect(await readFile(join(extractDir, 'a.csv.md'), 'utf8')).toMatch(/Ada/);
   });
 
+  it('copies an image through unchanged and marks the record ok', async () => {
+    const { inputDir, extractDir } = await createDirs();
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    await writeFile(join(inputDir, 'logo.png'), png);
+
+    const records = await extractInputFiles(inputDir, extractDir, ['logo.png']);
+
+    expect(records[0]).toMatchObject({ status: 'ok', kind: 'image', extractPath: 'logo.png' });
+    expect(await readFile(join(extractDir, 'logo.png'))).toEqual(png);
+  });
+
   it('marks unknown types as unsupported', async () => {
     const { inputDir, extractDir } = await createDirs();
     await writeFile(join(inputDir, 'a.bin'), 'nope');

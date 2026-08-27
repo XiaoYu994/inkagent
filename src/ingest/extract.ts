@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 
 import { formatError } from '../errors.js';
 import { convertDocumentToMarkdown } from './extractAnydoc.js';
-import { detectSourceKind, isPassthroughKind, type SourceKind } from './sourceKind.js';
+import { detectSourceKind, isAnydocKind, type SourceKind } from './sourceKind.js';
 
 export type ExtractStatus = 'ok' | 'unsupported' | 'error';
 
@@ -27,6 +27,29 @@ export async function extractInputFiles(
   return records;
 }
 
+async function copyImage(
+  extractDir: string,
+  sourcePath: string,
+  absoluteSource: string,
+): Promise<ExtractRecord> {
+  const extractPath = sourcePath;
+  const destination = join(extractDir, extractPath);
+
+  try {
+    await mkdir(dirname(destination), { recursive: true });
+    await cp(absoluteSource, destination);
+    return { sourcePath, kind: 'image', status: 'ok', extractPath, errorMessage: undefined };
+  } catch (error) {
+    return {
+      sourcePath,
+      kind: 'image',
+      status: 'error',
+      extractPath: undefined,
+      errorMessage: `复制图片失败 ${sourcePath}: ${formatError(error)}`,
+    };
+  }
+}
+
 async function extractOneFile(
   inputDir: string,
   extractDir: string,
@@ -46,16 +69,13 @@ async function extractOneFile(
   }
 
   if (kind === 'image') {
-    const extractPath = sourcePath;
-    await mkdir(dirname(join(extractDir, extractPath)), { recursive: true });
-    await cp(absoluteSource, join(extractDir, extractPath));
-    return { sourcePath, kind, status: 'ok', extractPath, errorMessage: undefined };
+    return copyImage(extractDir, sourcePath, absoluteSource);
   }
 
   try {
-    const text = isPassthroughKind(kind)
-      ? (await readFile(absoluteSource, 'utf8')).trim()
-      : await convertDocumentToMarkdown(absoluteSource);
+    const text = isAnydocKind(kind)
+      ? await convertDocumentToMarkdown(absoluteSource)
+      : (await readFile(absoluteSource, 'utf8')).trim();
     const extractPath = `${sourcePath}.md`;
     const destination = join(extractDir, extractPath);
     await mkdir(dirname(destination), { recursive: true });

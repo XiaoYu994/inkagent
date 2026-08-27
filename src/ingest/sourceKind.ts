@@ -54,8 +54,6 @@ const extensionToKind: Record<string, SourceKind> = {
   '.epub': 'epub',
 };
 
-const passthroughKinds = new Set<SourceKind>(['markdown', 'plain-text', 'html']);
-
 export function detectSourceKind(fileName: string): SourceKind {
   const dot = fileName.lastIndexOf('.');
   if (dot <= 0) {
@@ -65,10 +63,19 @@ export function detectSourceKind(fileName: string): SourceKind {
   return extensionToKind[extension] ?? 'unsupported';
 }
 
-export function isPassthroughKind(kind: SourceKind): boolean {
-  return passthroughKinds.has(kind);
-}
+const nonAnydocKinds = new Set<SourceKind>([
+  'unsupported',
+  'image',
+  'markdown',
+  'plain-text',
+  'html',
+]);
 
-export function isAnydocKind(kind: SourceKind): boolean {
-  return kind !== 'unsupported' && kind !== 'image' && !isPassthroughKind(kind);
+export type AnydocKind = Exclude<
+  SourceKind,
+  'unsupported' | 'image' | 'markdown' | 'plain-text' | 'html'
+>;
+
+export function isAnydocKind(kind: SourceKind): kind is AnydocKind {
+  return !nonAnydocKinds.has(kind);
 }

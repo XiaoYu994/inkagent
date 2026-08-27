@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { stat } from 'node:fs/promises';
 
 import { createPiDocumentAgent } from './agent/piDocumentAgent.js';
 import type { DocumentAgent } from './agent/documentAgent.js';
@@ -37,15 +38,20 @@ export async function generateDocument(
     throw new InkAgentError('brief 不能为空');
   }
 
+  await assertInputDirReadable(options.inputDir);
+
   const workDir = options.workDir ?? join(process.cwd(), '.inkagent', 'jobs');
   const workspace = await createJobWorkspace(workDir);
   const sourcePaths = await copyInputTree(options.inputDir, workspace.inputDir);
+  if (sourcePaths.length === 0) {
+    throw new InkAgentError(`输入目录中没有可用材料: ${options.inputDir}`);
+  }
   const extracts = await extractInputFiles(workspace.inputDir, workspace.extractDir, sourcePaths);
 
   await writeBrief(workspace, brief);
   await writeManifest(workspace, extracts);
 
-  assertExtractsUsable(extracts, sourcePaths.length);
+  assertExtractsUsable(extracts);
 
   const documentAgent = options.documentAgent ?? (await createPiDocumentAgent());
   await documentAgent.generate(workspace.rootDir);
@@ -68,14 +74,22 @@ async function writeManifest(workspace: JobWorkspace, extracts: ExtractRecord[])
   });
 }
 
-function assertExtractsUsable(extracts: ExtractRecord[], sourceCount: number): void {
-  if (sourceCount === 0) {
-    return;
-  }
-
+function assertExtractsUsable(extracts: ExtractRecord[]): void {
   const failedAll = extracts.every((record) => record.status !== 'ok');
   if (failedAll) {
     const details = extracts.map((record) => record.errorMessage ?? record.sourcePath).join('; ');
     throw new InkAgentError(`没有可用来生成文档的材料。${details}`);
+  }
+}
+
+async function assertInputDirReadable(inputDir: string): Promise<void> {
+  let stats;
+  try {
+    stats = await stat(inputDir);
+  } catch (error) {
+    throw new InkAgentError(`读取输入目录失败: ${inputDir}`, { cause: error });
+  }
+  if (!stats.isDirectory()) {
+    throw new InkAgentError(`输入路径不是目录: ${inputDir}`);
   }
 }

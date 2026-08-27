@@ -45,6 +45,31 @@ describe('generateDocument', () => {
     expect(manifest.extracts).toHaveLength(2);
   });
 
+  it('rejects an empty input directory and a missing input directory', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'inkagent-gen-empty-'));
+    await mkdir(join(root, 'in'));
+
+    await expect(
+      generateDocument({
+        inputDir: join(root, 'in'),
+        outputDir: join(root, 'out'),
+        workDir: join(root, 'jobs'),
+        brief: '写文档',
+        documentAgent: createStubDocumentAgent(),
+      }),
+    ).rejects.toThrow('输入目录中没有可用材料');
+
+    await expect(
+      generateDocument({
+        inputDir: join(root, 'no-such-dir'),
+        outputDir: join(root, 'out'),
+        workDir: join(root, 'jobs'),
+        brief: '写文档',
+        documentAgent: createStubDocumentAgent(),
+      }),
+    ).rejects.toThrow('读取输入目录失败');
+  });
+
   it('throws when every input file is unsupported', async () => {
     const root = await mkdtemp(join(tmpdir(), 'inkagent-gen-bad-'));
     const inputDir = join(root, 'in');

@@ -5,9 +5,20 @@ export class InkAgentError extends Error {
   }
 }
 
-export function formatError(error: unknown): string {
-  if (error instanceof Error) {
+export function formatError(error: unknown, options?: { verbose?: boolean }): string {
+  if (!(error instanceof Error)) {
+    return String(error);
+  }
+
+  if (!options?.verbose) {
     return error.message;
   }
-  return String(error);
+
+  const lines = [error.stack ?? error.message];
+  let cause = error.cause;
+  while (cause instanceof Error) {
+    lines.push(`Caused by: ${cause.message}`);
+    cause = cause.cause;
+  }
+  return lines.join('\n');
 }

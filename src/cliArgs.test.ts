@@ -5,7 +5,7 @@ import { InkAgentError } from './errors.js';
 
 describe('parseGenerateArgs', () => {
   it('reads in out work-dir and brief', () => {
-    const options = parseGenerateArgs([
+    const parsed = parseGenerateArgs([
       'generate',
       '--in',
       './uploads',
@@ -16,13 +16,38 @@ describe('parseGenerateArgs', () => {
       '写一份技术方案',
     ]);
 
-    expect(options.inputDir).toBe('./uploads');
-    expect(options.outputDir).toBe('./output');
-    expect(options.workDir).toBe('./tmp');
-    expect(options.brief).toBe('写一份技术方案');
+    expect(parsed).toMatchObject({
+      kind: 'options',
+      options: {
+        inputDir: './uploads',
+        outputDir: './output',
+        workDir: './tmp',
+        brief: '写一份技术方案',
+      },
+    });
+  });
+
+  it('returns the help text for -h', () => {
+    const parsed = parseGenerateArgs(['-h']);
+
+    expect(parsed.kind).toBe('help');
+    expect(parsed.kind === 'help' && parsed.text).toContain('--work-dir');
+  });
+
+  it('wraps unknown flags into InkAgentError with usage', () => {
+    expect(() => parseGenerateArgs(['generate', '--nope'])).toThrow(InkAgentError);
+    try {
+      parseGenerateArgs(['generate', '--nope']);
+    } catch (error) {
+      expect((error as Error).message).toContain('用法');
+    }
   });
 
   it('rejects missing generate command', () => {
     expect(() => parseGenerateArgs(['--in', 'a'])).toThrow(InkAgentError);
+  });
+
+  it('rejects missing brief text', () => {
+    expect(() => parseGenerateArgs(['generate', '--in', 'a', '--out', 'b'])).toThrow(/brief/);
   });
 });

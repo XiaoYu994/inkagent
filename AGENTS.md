@@ -2,11 +2,11 @@
 
 本仓库的开发规范采用**渐进式披露**：
 
-| 层 | 位置 | 何时进入上下文 |
-| --- | --- | --- |
-| 协议与索引 | 本文件 | 会话开始时自动加载 |
-| 条文正文 | [`.agents/spec/`](.agents/spec/) | 按任务用文件工具打开，禁止整目录一次性读入 |
-| 来源与目录 | [`.agents/spec/README.md`](.agents/spec/README.md) | 维护规范或查来源时再读 |
+| 层         | 位置                                               | 何时进入上下文                             |
+| ---------- | -------------------------------------------------- | ------------------------------------------ |
+| 协议与索引 | 本文件                                             | 会话开始时自动加载                         |
+| 条文正文   | [`.agents/spec/`](.agents/spec/)                   | 按任务用文件工具打开，禁止整目录一次性读入 |
+| 来源与目录 | [`.agents/spec/README.md`](.agents/spec/README.md) | 维护规范或查来源时再读                     |
 
 条文只住在 `.agents/spec/`。本文件不复述细则。凭记忆执行规范**不算已读**。规范文件以主题 kebab-case 命名，不加序号；顺序由本文加载表与 README 目录决定。
 
@@ -30,17 +30,17 @@
 
 然后按当前工作**追加**，而不是替换：
 
-| 即将做的事 | 再读 |
-| --- | --- |
-| 写注释、文档字符串，或删注释 | [comments.md](.agents/spec/comments.md) |
-| 组织文件、排函数顺序、新建源文件 | [formatting.md](.agents/spec/formatting.md) |
-| 设计类型/模块边界、封装数据、接入第三方、出现链式 `.get().get()` | [abstraction.md](.agents/spec/abstraction.md) |
-| 抛错、捕获、返回错误、处理空值或缺省 | [error-handling.md](.agents/spec/error-handling.md) |
-| 写测试、改测试、评审测试；重构前确认保护网 | [testing.md](.agents/spec/testing.md) |
-| 改既有结构、识别坏味道、加功能前铺路 | [refactoring.md](.agents/spec/refactoring.md) |
-| 建分支、开合并请求、发版、热修 | [branching.md](.agents/spec/branching.md) |
-| 写 commit、squash 说明、整理提交历史 | [commits.md](.agents/spec/commits.md) |
-| 评审 diff | 按改动主题打开对应文件，用文末清单当评审问题 |
+| 即将做的事                                                       | 再读                                                |
+| ---------------------------------------------------------------- | --------------------------------------------------- |
+| 写注释、文档字符串，或删注释                                     | [comments.md](.agents/spec/comments.md)             |
+| 组织文件、排函数顺序、新建源文件                                 | [formatting.md](.agents/spec/formatting.md)         |
+| 设计类型/模块边界、封装数据、接入第三方、出现链式 `.get().get()` | [abstraction.md](.agents/spec/abstraction.md)       |
+| 抛错、捕获、返回错误、处理空值或缺省                             | [error-handling.md](.agents/spec/error-handling.md) |
+| 写测试、改测试、评审测试；重构前确认保护网                       | [testing.md](.agents/spec/testing.md)               |
+| 改既有结构、识别坏味道、加功能前铺路                             | [refactoring.md](.agents/spec/refactoring.md)       |
+| 建分支、开合并请求、发版、热修                                   | [branching.md](.agents/spec/branching.md)           |
+| 写 commit、squash 说明、整理提交历史                             | [commits.md](.agents/spec/commits.md)               |
+| 评审 diff                                                        | 按改动主题打开对应文件，用文末清单当评审问题        |
 
 只改测试则 `naming` + `testing` 即可，不必再读 `functions`。只改注释则 `comments`。从开分支到提交：同时读 `branching` + `commits`，不必先读 `naming`/`functions`。
 
@@ -55,6 +55,14 @@
 - **童子军军规**：顺手只修本次任务能负担的问题，不做超范围迁移。
 - **两顶帽子**：加功能与重构不同时做，也不塞进同一次提交。见 [refactoring.md](.agents/spec/refactoring.md)。
 - **生成代码**：与手写同一套验收标准。"能跑"不够。
+
+## 构建与测试
+
+- 安装：`npm install`（Node.js 22+）
+- 类型检查：`npm run typecheck`
+- 测试：`npm test`
+- 构建：`npm run build`
+- 检查风格：`npm run lint`
 
 ## 完成标准
 

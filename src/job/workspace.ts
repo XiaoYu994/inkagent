@@ -1,4 +1,4 @@
-import { mkdir, readdir, cp, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, cp, writeFile, realpath } from 'node:fs/promises';
 import { join, relative, resolve, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
@@ -37,28 +37,34 @@ export async function createJobWorkspace(parentDir: string): Promise<JobWorkspac
 }
 
 export async function copyInputTree(sourceDir: string, destinationDir: string): Promise<string[]> {
-  const sourceRoot = resolve(sourceDir);
+  const sourceRoot = await realpath(resolve(sourceDir));
   const copied: string[] = [];
 
   const entries = await readdir(sourceRoot, { recursive: true, withFileTypes: true });
   for (const entry of entries) {
-    if (!entry.isFile() || isHiddenPath(entry.name)) {
+    if (!entry.isFile() && !entry.isSymbolicLink()) {
       continue;
     }
 
     const parentDir =
       'parentPath' in entry && typeof entry.parentPath === 'string' ? entry.parentPath : sourceRoot;
-    const absolutePath = resolve(parentDir, entry.name);
-    assertInsideRoot(sourceRoot, absolutePath);
+    const inTreePath = resolve(parentDir, entry.name);
 
-    const relativePath = relative(sourceRoot, absolutePath);
+    let absolutePath: string;
+    try {
+      absolutePath = await realpath(inTreePath);
+    } catch (error) {
+      throw new InkAgentError(`无法读取输入项 ${inTreePath}`, { cause: error });
+    }
+
+    const relativePath = relative(sourceRoot, inTreePath);
     if (relativePath.split(sep).some((segment) => isHiddenPath(segment))) {
       continue;
     }
 
     const destinationPath = join(destinationDir, relativePath);
     await mkdir(join(destinationPath, '..'), { recursive: true });
-    await cp(absolutePath, destinationPath);
+    await cp(absolutePath, destinationPath, { dereference: true, recursive: true });
     copied.push(relativePath.split(sep).join('/'));
   }
 
@@ -84,11 +90,4 @@ export async function copyOutputTree(sourceDir: string, destinationDir: string):
 
 function isHiddenPath(name: string): boolean {
   return name.startsWith('.');
-}
-
-function assertInsideRoot(rootDir: string, candidatePath: string): void {
-  const relativePath = relative(rootDir, candidatePath);
-  if (relativePath.startsWith('..') || relativePath === '') {
-    throw new InkAgentError(`拒绝读取工作区之外的路径: ${candidatePath}`);
-  }
 }

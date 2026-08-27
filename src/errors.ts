@@ -5,6 +5,15 @@ export class InkAgentError extends Error {
   }
 }
 
+export function isEnoentError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as NodeJS.ErrnoException).code === 'ENOENT'
+  );
+}
+
 export function formatError(error: unknown, options?: { verbose?: boolean }): string {
   if (!(error instanceof Error)) {
     return String(error);

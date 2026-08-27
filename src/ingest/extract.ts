@@ -78,7 +78,7 @@ async function extractOneFile(
       ? await convertDocumentToMarkdown(absoluteSource)
       : (await readFile(absoluteSource, 'utf8')).trim();
     // 原名保留在路径里，材料出处可追溯；kind 子目录避免抽取产物与原文混杂。
-    const mdSuffix = sourcePath.endsWith('.md') ? '' : '.md';
+    const mdSuffix = kind === 'markdown' ? '' : '.md';
     const extractPath = `${kind}/${sourcePath}${mdSuffix}`;
     const destination = join(extractDir, extractPath);
     await mkdir(dirname(destination), { recursive: true });

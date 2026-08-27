@@ -1,25 +1,25 @@
 import { join } from 'node:path';
 import { stat } from 'node:fs/promises';
 
-import { createPiDocumentAgent } from './agent/piAgent.js';
+import { createPiDocumentAgent, type PiModelSelection } from './agent/piAgent.js';
 import type { DocumentAgent } from './agent/documentAgent.js';
 import { InkAgentError } from './errors.js';
 import { extractInputFiles, type ExtractRecord } from './ingest/extract.js';
-import { copyInputTree, copyOutputTree } from './job/copyTree.js';
+import { assertOutputDirUsable, copyInputTree, copyOutputTree } from './job/copyTree.js';
 import {
   createJobWorkspace,
   writeBrief,
   writeJsonFile,
   type JobWorkspace,
 } from './job/workspace.js';
-import { loadProjectConfig, type ThinkingLevel } from './projectConfig.js';
+import { loadProjectConfig, type ProjectConfig, type ThinkingLevel } from './projectConfig.js';
 
 export type GenerateDocumentOptions = {
   inputDir: string;
   outputDir: string;
   brief: string;
   workDir?: string;
-  /** 覆盖项目配置与 Pi 全局默认的模型引用，规范形式 "provider/modelId"。 */
+  /** 覆盖 inkagent.json 的模型引用，规范形式 "provider/modelId"。 */
   model?: string;
   thinkingLevel?: ThinkingLevel;
   documentAgent?: DocumentAgent;
@@ -42,6 +42,7 @@ export async function generateDocument(
   }
 
   await assertInputDirReadable(options.inputDir);
+  await assertOutputDirUsable(options.outputDir);
 
   const workDir = options.workDir ?? join(process.cwd(), '.inkagent', 'jobs');
   const workspace = await createJobWorkspace(workDir);
@@ -70,19 +71,26 @@ export async function generateDocument(
   };
 }
 
-async function createDefaultAgent(options: GenerateDocumentOptions): Promise<DocumentAgent> {
-  if (options.model === undefined && options.thinkingLevel === undefined) {
-    const config = await loadProjectConfig(process.cwd());
-    return createPiDocumentAgent(config);
+export function resolveDocumentAgentSelection(
+  options: Pick<GenerateDocumentOptions, 'model' | 'thinkingLevel'>,
+  config: ProjectConfig | undefined,
+): PiModelSelection {
+  const model = options.model ?? config?.model;
+  if (model === undefined) {
+    throw new InkAgentError(
+      '必须指定模型：使用 --model provider/modelId，或在 inkagent.json 中设置 model',
+    );
   }
+  const thinkingLevel = options.thinkingLevel ?? config?.thinkingLevel;
+  if (thinkingLevel === undefined) {
+    return { model };
+  }
+  return { model, thinkingLevel };
+}
 
-  // 显式选项优优先；缺失的维度仍允许由配置文件补齐。
-  const explicit = {
-    ...(options.model === undefined ? {} : { model: options.model }),
-    ...(options.thinkingLevel === undefined ? {} : { thinkingLevel: options.thinkingLevel }),
-  };
+async function createDefaultAgent(options: GenerateDocumentOptions): Promise<DocumentAgent> {
   const config = await loadProjectConfig(process.cwd());
-  return createPiDocumentAgent({ ...config, ...explicit });
+  return createPiDocumentAgent(resolveDocumentAgentSelection(options, config));
 }
 
 async function writeManifest(workspace: JobWorkspace, extracts: ExtractRecord[]): Promise<void> {

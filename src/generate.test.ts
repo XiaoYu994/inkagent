@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { createStubDocumentAgent } from './agent/stubAgent.js';
-import { generateDocument } from './generate.js';
+import { generateDocument, resolveDocumentAgentSelection } from './generate.js';
 import { InkAgentError } from './errors.js';
 import { createPdfWithText } from './ingest/officeFixtures.js';
 
@@ -70,6 +70,54 @@ describe('generateDocument', () => {
     ).rejects.toThrow('读取输入目录失败');
   });
 
+  it('rejects an output path that is a file before running the agent', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'inkagent-gen-out-file-'));
+    const inputDir = join(root, 'in');
+    await mkdir(inputDir);
+    await writeFile(join(inputDir, 'notes.md'), '# n\n');
+    await writeFile(join(root, 'out'), 'not a dir');
+
+    let generated = false;
+    await expect(
+      generateDocument({
+        inputDir,
+        outputDir: join(root, 'out'),
+        workDir: join(root, 'jobs'),
+        brief: '写文档',
+        documentAgent: {
+          generate: async () => {
+            generated = true;
+          },
+        },
+      }),
+    ).rejects.toThrow(/不是目录/);
+    expect(generated).toBe(false);
+  });
+
+  it('clears leftover markdown from a previous generate into the same out dir', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'inkagent-gen-stale-'));
+    const inputDir = join(root, 'in');
+    const outputDir = join(root, 'out');
+    const workDir = join(root, 'jobs');
+    await mkdir(inputDir);
+    await writeFile(join(inputDir, 'notes.md'), '# 材料\n');
+    await mkdir(outputDir);
+    await writeFile(join(outputDir, 'chapter-2.md'), 'stale\n');
+
+    const result = await generateDocument({
+      inputDir,
+      outputDir,
+      workDir,
+      brief: '写文档',
+      documentAgent: createStubDocumentAgent('# 新稿\n'),
+    });
+
+    expect(result.outputFiles).toEqual(['document.md']);
+    await expect(readFile(join(outputDir, 'chapter-2.md'), 'utf8')).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+  });
+
   it('throws when every input file is unsupported', async () => {
     const root = await mkdtemp(join(tmpdir(), 'inkagent-gen-bad-'));
     const inputDir = join(root, 'in');
@@ -85,5 +133,22 @@ describe('generateDocument', () => {
         documentAgent: createStubDocumentAgent(),
       }),
     ).rejects.toBeInstanceOf(InkAgentError);
+  });
+});
+
+describe('resolveDocumentAgentSelection', () => {
+  it('lets CLI options override project config and requires a model', () => {
+    expect(
+      resolveDocumentAgentSelection(
+        { model: 'openai/gpt-5', thinkingLevel: 'low' },
+        { model: 'zai-coding-cn/glm-5.3-flash', thinkingLevel: 'xhigh' },
+      ),
+    ).toEqual({ model: 'openai/gpt-5', thinkingLevel: 'low' });
+
+    expect(resolveDocumentAgentSelection({}, { model: 'zai-coding-cn/glm-5.3-flash' })).toEqual({
+      model: 'zai-coding-cn/glm-5.3-flash',
+    });
+
+    expect(() => resolveDocumentAgentSelection({}, undefined)).toThrow(/必须指定模型/);
   });
 });

@@ -8,6 +8,18 @@ import { extractInputFiles } from './extract.js';
 import { createDocxWithText, createPdfWithText } from './officeFixtures.js';
 
 describe('extractInputFiles', () => {
+  it('keeps a .markdown source name without appending another .md', async () => {
+    const { inputDir, extractDir } = await createDirs();
+    await writeFile(join(inputDir, 'notes.markdown'), '# Title\n\nbody\n');
+
+    const records = await extractInputFiles(inputDir, extractDir, ['notes.markdown']);
+
+    expect(records[0]?.extractPath).toBe('markdown/notes.markdown');
+    expect(await readFile(join(extractDir, 'markdown', 'notes.markdown'), 'utf8')).toContain(
+      'body',
+    );
+  });
+
   it('copies markdown text into extract markdown', async () => {
     const { inputDir, extractDir } = await createDirs();
     await writeFile(join(inputDir, 'notes.md'), '# Title\n\nbody\n');

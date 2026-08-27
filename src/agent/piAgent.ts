@@ -3,7 +3,6 @@ import { join } from 'node:path';
 import {
   createAgentSession,
   DefaultResourceLoader,
-  getAgentDir,
   ModelRuntime,
   resolveCliModel,
   SessionManager,
@@ -12,18 +11,17 @@ import {
 } from '@earendil-works/pi-coding-agent';
 
 import type { DocumentAgent } from './documentAgent.js';
+import { createJobBoundTools, jobBoundToolNames } from './jobTools.js';
 import type { ThinkingLevel } from '../projectConfig.js';
 import { InkAgentError } from '../errors.js';
 import { documentAgentPrompt } from './prompt.js';
 
 export type PiModelSelection = {
-  /** "provider/modelId" 或裸 "modelId"；也接受 Pi 支持的 pattern 语法。 */
-  model?: string;
-  /** 最高优先级档位；缺省时依次取模型 pattern 后缀、Pi 用户全局默认。 */
+  model: string;
   thinkingLevel?: ThinkingLevel;
 };
 
-export async function createPiDocumentAgent(selection?: PiModelSelection): Promise<DocumentAgent> {
+export async function createPiDocumentAgent(selection: PiModelSelection): Promise<DocumentAgent> {
   return {
     async generate(jobDir: string): Promise<void> {
       await runPiDocumentSession(jobDir, selection);
@@ -31,46 +29,28 @@ export async function createPiDocumentAgent(selection?: PiModelSelection): Promi
   };
 }
 
-async function runPiDocumentSession(jobDir: string, selection: PiModelSelection | undefined) {
-  const modelRuntime = await ModelRuntime.create();
-  const available = await modelRuntime.getAvailable();
-  if (available.length === 0) {
-    throw new InkAgentError('没有可用的模型。请先配置 Pi 的 API 密钥，或运行 `pi auth`。');
-  }
+export async function listAvailableModelIds(): Promise<string[]> {
+  const { available } = await createAuthenticatedModelRuntime();
+  return available.map((model) => `${model.provider}/${model.id}`).sort();
+}
 
-  // 真实用户全局设置仅提供模型/thinking 等运行偏好。
-  const userSettings = SettingsManager.create(jobDir, getAgentDir());
-  const explicitModel = resolveExplicitModel(modelRuntime, selection?.model);
+async function runPiDocumentSession(jobDir: string, selection: PiModelSelection) {
+  const { modelRuntime, available } = await createAuthenticatedModelRuntime();
+  const explicitModel = resolveExplicitModel(modelRuntime, selection.model);
+  assertModelHasAuth(explicitModel.model, available, selection.model);
 
-  // 资源发现层用干净设置：避免把用户 packages/extensions 拉进任务沙箱。
-  const agentDir = join(jobDir, '.pi-home');
-  const loader = new DefaultResourceLoader({
-    cwd: jobDir,
-    agentDir,
-    settingsManager: SettingsManager.inMemory({}),
-    noExtensions: true,
-    noSkills: true,
-    noPromptTemplates: true,
-    noThemes: true,
-    noContextFiles: true,
-    systemPrompt: documentAgentPrompt,
-  });
-  await loader.reload();
-
-  const thinkingLevel =
-    selection?.thinkingLevel ??
-    explicitModel.thinkingLevel ??
-    (userSettings.getGlobalSettings().defaultThinkingLevel as ThinkingLevel | undefined);
-
+  const { agentDir, settingsManager, resourceLoader } = await createJobAgentResources(jobDir);
+  const thinkingLevel = selection.thinkingLevel ?? explicitModel.thinkingLevel;
   const { session } = await createAgentSession({
     cwd: jobDir,
     agentDir,
     modelRuntime,
-    tools: ['read', 'write', 'edit', 'grep', 'find', 'ls'],
-    resourceLoader: loader,
+    tools: jobBoundToolNames(),
+    customTools: createJobBoundTools(jobDir),
+    resourceLoader,
     sessionManager: SessionManager.create(jobDir, join(jobDir, 'sessions')),
-    settingsManager: userSettings,
-    ...(explicitModel.model === undefined ? {} : { model: explicitModel.model }),
+    settingsManager,
+    model: explicitModel.model,
     ...(thinkingLevel === undefined ? {} : { thinkingLevel }),
   });
 
@@ -85,28 +65,74 @@ async function runPiDocumentSession(jobDir: string, selection: PiModelSelection 
   }
 }
 
+async function createAuthenticatedModelRuntime(): Promise<{
+  modelRuntime: ModelRuntime;
+  available: Awaited<ReturnType<ModelRuntime['getAvailable']>>;
+}> {
+  const modelRuntime = await ModelRuntime.create();
+  const available = await modelRuntime.getAvailable();
+  if (available.length === 0) {
+    throw new InkAgentError('没有可用的模型。请先配置 API 密钥（环境变量或 `pi auth`）。');
+  }
+  return { modelRuntime, available };
+}
+
+async function createJobAgentResources(jobDir: string) {
+  const agentDir = join(jobDir, '.pi-home');
+  const settingsManager = SettingsManager.inMemory({});
+  const resourceLoader = new DefaultResourceLoader({
+    cwd: jobDir,
+    agentDir,
+    settingsManager,
+    noExtensions: true,
+    noSkills: true,
+    noPromptTemplates: true,
+    noThemes: true,
+    noContextFiles: true,
+    systemPrompt: documentAgentPrompt,
+  });
+  await resourceLoader.reload();
+  return { agentDir, settingsManager, resourceLoader };
+}
+
 function resolveExplicitModel(
   runtime: ModelRuntime,
-  reference: string | undefined,
+  reference: string,
 ): {
-  model?: ResolveCliModelResult['model'];
+  model: NonNullable<ResolveCliModelResult['model']>;
   thinkingLevel?: ResolveCliModelResult['thinkingLevel'];
 } {
-  if (reference === undefined) {
-    return {};
-  }
-
-  const slashIndex = reference.indexOf('/');
   const result = resolveCliModel({
-    ...(slashIndex >= 0 ? { cliProvider: reference.slice(0, slashIndex) } : {}),
-    cliModel: slashIndex >= 0 ? reference.slice(slashIndex + 1) : reference,
+    cliModel: reference,
     modelRuntime: runtime,
   });
+
+  if (result.warning !== undefined) {
+    process.stderr.write(`${result.warning}\n`);
+  }
 
   if (result.error !== undefined || result.model === undefined) {
     throw new InkAgentError(
       result.error ?? `找不到模型 "${reference}"，可在 inkagent.json 或 --model 中换一个引用。`,
     );
   }
-  return result;
+  if (result.thinkingLevel === undefined) {
+    return { model: result.model };
+  }
+  return { model: result.model, thinkingLevel: result.thinkingLevel };
+}
+
+function assertModelHasAuth(
+  model: NonNullable<ResolveCliModelResult['model']>,
+  available: readonly { provider: string; id: string }[],
+  reference: string,
+): void {
+  const hasAuth = available.some(
+    (candidate) => candidate.provider === model.provider && candidate.id === model.id,
+  );
+  if (!hasAuth) {
+    throw new InkAgentError(
+      `模型 "${reference}" 没有可用的 API 密钥。请设置对应环境变量，或运行 \`pi auth\`。`,
+    );
+  }
 }

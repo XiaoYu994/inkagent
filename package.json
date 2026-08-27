@@ -7,7 +7,7 @@
     "inkagent": "./dist/cli.js"
   },
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=22.19.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

@@ -1,14 +1,14 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { InkAgentError } from './errors.js';
+import { InkAgentError, isEnoentError } from './errors.js';
 
 export const thinkingLevels = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 
 export type ThinkingLevel = (typeof thinkingLevels)[number];
 
 export type ProjectConfig = {
-  /** 规范形式为 "provider/modelId"，也可只写 "modelId"（跨提供方重名时会得到明确报错）。 */
+  /** 规范形式为 "provider/modelId"；也可只写 "modelId"（跨提供方重名时会得到明确报错）。 */
   model?: string;
   thinkingLevel?: ThinkingLevel;
 };
@@ -22,7 +22,7 @@ export async function readProjectConfigFile(path: string): Promise<ProjectConfig
   try {
     raw = await readFile(path, 'utf8');
   } catch (error) {
-    if (isMissingFileError(error)) {
+    if (isEnoentError(error)) {
       return undefined;
     }
     throw new InkAgentError(`读取项目配置失败: ${path}`, { cause: error });
@@ -74,13 +74,4 @@ function expectThinkingLevel(key: string, fieldValue: unknown, path: string): Th
     throw new InkAgentError(`项目配置字段 "${key}" 只支持: ${expected}: ${path}`);
   }
   return level as ThinkingLevel;
-}
-
-function isMissingFileError(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as NodeJS.ErrnoException).code === 'ENOENT'
-  );
 }

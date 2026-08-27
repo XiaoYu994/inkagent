@@ -6,8 +6,8 @@
 
 ## 要求
 
-- Node.js 22.13+
-- 真实生成需要已配置的 Pi 模型密钥（`pi auth` 或相应环境变量）
+- Node.js 22.19+
+- 真实生成需要模型 API 密钥（环境变量，或 `pi auth`）
 
 ## 脚本
 
@@ -24,16 +24,16 @@ npm run format:check
 
 ```bash
 npm run build
-node dist/cli.js generate --in ./uploads --out ./output "根据这些材料写一份技术方案"
+node dist/cli.js generate --in ./uploads --out ./output --model zai-coding-cn/glm-5.3-flash "根据这些材料写一份技术方案"
 ```
 
-`--in` 支持 Markdown / 纯文本 / HTML / 常见图片，以及 anydoc 能转成 Markdown 的办公格式（PDF、Word、PPT、Excel、OpenDocument、RTF、EPUB、CSV 等）。任务过程文件写在 `.inkagent/jobs/`（可用 `--work-dir` 覆盖）。扫描件 PDF 需要 OCR，第一版不覆盖。
+`--in` 支持 Markdown / 纯文本 / HTML / 常见图片，以及 anydoc 能转成 Markdown 的办公格式（PDF、Word、PPT、Excel、OpenDocument、RTF、EPUB、CSV 等）。任务过程文件写在 `.inkagent/jobs/`（可用 `--work-dir` 覆盖）。扫描件 PDF 需要 OCR，第一版不覆盖。`--out` 每次生成会先清空再写入本轮 Markdown。
 
 ## 模型选择
 
-按优先级取用：
+模型必须显式指定，**不会**使用本机 Pi 的全局默认模型。优先级：
 
-1. 命令行覆盖：`--model provider/modelId --thinking-level high`
+1. 命令行：`--model provider/modelId --thinking-level high`
 2. 项目配置文件 `inkagent.json`（建议提交到仓库供团队共享）：
 
    ```json
@@ -43,4 +43,10 @@ node dist/cli.js generate --in ./uploads --out ./output "根据这些材料写�
    }
    ```
 
-3. 都未指定时沿用你 Pi 全局默认（`pi auth` 与 pi 设置里的 defaultModel）。
+列出当前密钥下可用的模型：
+
+```bash
+node dist/cli.js models
+```
+
+密钥仍走环境变量（例如 `ZAI_CODING_CN_API_KEY`）或 `pi auth`。没有 `--model` 且没有 `inkagent.json` 的 `model` 时会直接报错。

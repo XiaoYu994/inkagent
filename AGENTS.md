@@ -58,7 +58,7 @@
 
 ## 构建与测试
 
-- 安装：`npm install`（Node.js 22.13+）
+- 安装：`npm install`（Node.js 22.19+）
 - 类型检查：`npm run typecheck`
 - 测试：`npm test`
 - 构建：`npm run build`

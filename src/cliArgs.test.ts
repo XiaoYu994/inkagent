@@ -34,6 +34,44 @@ describe('parseGenerateArgs', () => {
     expect(parsed.kind === 'help' && parsed.text).toContain('--work-dir');
   });
 
+  it('reads model and thinking-level flags', () => {
+    const parsed = parseGenerateArgs([
+      'generate',
+      '--in',
+      './uploads',
+      '--out',
+      './output',
+      '--model',
+      'zai-coding-cn/glm-5.3-flash',
+      '--thinking-level',
+      'xhigh',
+      '写文档',
+    ]);
+
+    expect(parsed).toMatchObject({
+      kind: 'options',
+      options: {
+        model: 'zai-coding-cn/glm-5.3-flash',
+        thinkingLevel: 'xhigh',
+      },
+    });
+  });
+
+  it('rejects an unknown thinking level', () => {
+    expect(() =>
+      parseGenerateArgs([
+        'generate',
+        '--in',
+        'a',
+        '--out',
+        'b',
+        '--thinking-level',
+        'turbo',
+        '写文档',
+      ]),
+    ).toThrow(InkAgentError);
+  });
+
   it('wraps unknown flags into InkAgentError with usage', () => {
     expect(() => parseGenerateArgs(['generate', '--nope'])).toThrow(InkAgentError);
     try {

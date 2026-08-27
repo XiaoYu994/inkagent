@@ -12,12 +12,16 @@ import {
   writeJsonFile,
   type JobWorkspace,
 } from './job/workspace.js';
+import { loadProjectConfig, type ThinkingLevel } from './projectConfig.js';
 
 export type GenerateDocumentOptions = {
   inputDir: string;
   outputDir: string;
   brief: string;
   workDir?: string;
+  /** 覆盖项目配置与 Pi 全局默认的模型引用，规范形式 "provider/modelId"。 */
+  model?: string;
+  thinkingLevel?: ThinkingLevel;
   documentAgent?: DocumentAgent;
 };
 
@@ -52,7 +56,7 @@ export async function generateDocument(
 
   assertExtractsUsable(extracts);
 
-  const documentAgent = options.documentAgent ?? (await createPiDocumentAgent());
+  const documentAgent = options.documentAgent ?? (await createDefaultAgent(options));
   await documentAgent.generate(workspace.rootDir);
 
   const outputFiles = await copyOutputTree(workspace.outputDir, options.outputDir);
@@ -64,6 +68,21 @@ export async function generateDocument(
     outputFiles,
     extracts,
   };
+}
+
+async function createDefaultAgent(options: GenerateDocumentOptions): Promise<DocumentAgent> {
+  if (options.model === undefined && options.thinkingLevel === undefined) {
+    const config = await loadProjectConfig(process.cwd());
+    return createPiDocumentAgent(config);
+  }
+
+  // 显式选项优优先；缺失的维度仍允许由配置文件补齐。
+  const explicit = {
+    ...(options.model === undefined ? {} : { model: options.model }),
+    ...(options.thinkingLevel === undefined ? {} : { thinkingLevel: options.thinkingLevel }),
+  };
+  const config = await loadProjectConfig(process.cwd());
+  return createPiDocumentAgent({ ...config, ...explicit });
 }
 
 async function writeManifest(workspace: JobWorkspace, extracts: ExtractRecord[]): Promise<void> {

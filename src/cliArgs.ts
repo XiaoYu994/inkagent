@@ -1,6 +1,7 @@
 import { parseArgs } from 'node:util';
 
 import { InkAgentError, formatError } from './errors.js';
+import { thinkingLevels, type ThinkingLevel } from './projectConfig.js';
 import type { GenerateDocumentOptions } from './generate.js';
 
 export type ParsedGenerateArgs =
@@ -29,6 +30,14 @@ export function parseGenerateArgs(argv: string[]): ParsedGenerateArgs {
   }
 
   const workDir = values['work-dir'];
+  const model = values.model;
+  const thinkingLevel = values['thinking-level'];
+  if (thinkingLevel !== undefined && !thinkingLevels.some((level) => level === thinkingLevel)) {
+    throw new InkAgentError(
+      invalidWithUsage(`--thinking-level 只支持: ${thinkingLevels.join(' / ')}`),
+    );
+  }
+
   return {
     kind: 'options',
     options: {
@@ -36,12 +45,20 @@ export function parseGenerateArgs(argv: string[]): ParsedGenerateArgs {
       outputDir,
       brief,
       ...(workDir === undefined ? {} : { workDir }),
+      ...(model === undefined ? {} : { model }),
+      ...(thinkingLevel === undefined ? {} : { thinkingLevel: thinkingLevel as ThinkingLevel }),
     },
   };
 }
 
 function parseGenerateFlags(args: string[]): {
-  values: { in?: string; out?: string; 'work-dir'?: string };
+  values: {
+    in?: string;
+    out?: string;
+    'work-dir'?: string;
+    model?: string;
+    'thinking-level'?: string;
+  };
   positionals: string[];
 } {
   try {
@@ -52,8 +69,19 @@ function parseGenerateFlags(args: string[]): {
         in: { type: 'string' },
         out: { type: 'string' },
         'work-dir': { type: 'string' },
+        model: { type: 'string' },
+        'thinking-level': { type: 'string' },
       },
-    }) as { values: { in?: string; out?: string; 'work-dir'?: string }; positionals: string[] };
+    }) as {
+      values: {
+        in?: string;
+        out?: string;
+        'work-dir'?: string;
+        model?: string;
+        'thinking-level'?: string;
+      };
+      positionals: string[];
+    };
   } catch (error) {
     throw new InkAgentError(invalidWithUsage(formatError(error)), { cause: error });
   }
@@ -71,6 +99,8 @@ function usageText(): string {
     '  --in <目录>       输入材料目录（必填）',
     '  --out <目录>      终稿输出目录（必填）',
     '  --work-dir <目录> 任务过程文件目录，默认 ./.inkagent/jobs',
+    '  --model <引用>     指定模型（provider/modelId），默认取 inkagent.json 或 Pi 全局配置',
+    '  --thinking-level <档> off/minimal/low/medium/high/xhigh/max',
     '  -h, --help        显示本帮助',
     '',
   ].join('\n');

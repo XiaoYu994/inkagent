@@ -1,0 +1,51 @@
+import { mkdtemp, mkdir, writeFile, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { describe, expect, it } from 'vitest';
+
+import { createStubDocumentAgent } from './agent/stubDocumentAgent.js';
+import { generateDocument } from './generate.js';
+import { InkAgentError } from './errors.js';
+import { createPdfWithText } from './ingest/officeFixtures.js';
+
+describe('generateDocument', () => {
+  it('extracts inputs and copies stub markdown to the output directory', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'inkagent-gen-'));
+    const inputDir = join(root, 'in');
+    const outputDir = join(root, 'out');
+    const workDir = join(root, 'jobs');
+    await mkdir(inputDir);
+    await writeFile(join(inputDir, 'notes.md'), '# 材料\n\n接口超时 3s。\n');
+    await writeFile(join(inputDir, 'spec.pdf'), createPdfWithText('PDF Spec'));
+
+    const result = await generateDocument({
+      inputDir,
+      outputDir,
+      workDir,
+      brief: '根据材料写技术方案',
+      documentAgent: createStubDocumentAgent('# 技术方案\n\n已生成\n'),
+    });
+
+    expect(result.outputFiles).toContain('document.md');
+    expect(await readFile(join(outputDir, 'document.md'), 'utf8')).toContain('已生成');
+    expect(result.extracts.filter((record) => record.status === 'ok')).toHaveLength(2);
+  });
+
+  it('throws when every input file is unsupported', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'inkagent-gen-bad-'));
+    const inputDir = join(root, 'in');
+    await mkdir(inputDir);
+    await writeFile(join(inputDir, 'a.zip'), 'zip');
+
+    await expect(
+      generateDocument({
+        inputDir,
+        outputDir: join(root, 'out'),
+        workDir: join(root, 'jobs'),
+        brief: '写文档',
+        documentAgent: createStubDocumentAgent(),
+      }),
+    ).rejects.toBeInstanceOf(InkAgentError);
+  });
+});

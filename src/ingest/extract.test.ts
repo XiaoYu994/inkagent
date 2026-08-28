@@ -5,7 +5,11 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { extractInputFiles } from './extract.js';
-import { createDocxWithText, createPdfWithText } from './officeFixtures.js';
+import {
+  createDocxWithParagraphs,
+  createDocxWithText,
+  createPdfWithText,
+} from './officeFixtures.js';
 
 describe('extractInputFiles', () => {
   it('keeps a .markdown source name without appending another .md', async () => {
@@ -38,6 +42,29 @@ describe('extractInputFiles', () => {
 
     expect(records[0]?.status).toBe('ok');
     expect(await readFile(join(extractDir, 'pdf', 'a.pdf.md'), 'utf8')).toContain('Hello PDF');
+  });
+
+  it('drops consecutive drawing fragments from a docx and keeps the caption', async () => {
+    const { inputDir, extractDir } = await createDirs();
+    await writeFile(
+      join(inputDir, 'chart.docx'),
+      await createDocxWithParagraphs([
+        'PSD',
+        '(g2/Hz)',
+        'f',
+        '(Hz)',
+        '2000',
+        '振动谱形图如图2所示。',
+      ]),
+    );
+
+    const records = await extractInputFiles(inputDir, extractDir, ['chart.docx']);
+    const markdown = await readFile(join(extractDir, 'docx', 'chart.docx.md'), 'utf8');
+
+    expect(records[0]?.status).toBe('ok');
+    expect(markdown).toContain('振动谱形图如图2所示。');
+    expect(markdown).not.toContain('PSD');
+    expect(markdown).not.toContain('layout-debris');
   });
 
   it('extracts text from a docx', async () => {

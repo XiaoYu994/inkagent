@@ -29,7 +29,11 @@ export function createPdfWithText(text: string): Uint8Array {
   return new Uint8Array(Buffer.from(body));
 }
 
-export async function createDocxWithText(text: string): Promise<Buffer> {
+export function createDocxWithText(text: string): Promise<Buffer> {
+  return createDocxWithParagraphs([text]);
+}
+
+export async function createDocxWithParagraphs(paragraphs: string[]): Promise<Buffer> {
   const zip = new JSZip();
   zip.file(
     '[Content_Types].xml',
@@ -47,11 +51,14 @@ export async function createDocxWithText(text: string): Promise<Buffer> {
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
 </Relationships>`,
   );
+  const body = paragraphs
+    .map((paragraph) => `<w:p><w:r><w:t>${escapeXml(paragraph)}</w:t></w:r></w:p>`)
+    .join('');
   zip.file(
     'word/document.xml',
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:body><w:p><w:r><w:t>${escapeXml(text)}</w:t></w:r></w:p></w:body>
+  <w:body>${body}</w:body>
 </w:document>`,
   );
   return zip.generateAsync({ type: 'nodebuffer' });

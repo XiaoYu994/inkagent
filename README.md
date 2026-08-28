@@ -27,7 +27,7 @@ npm run build
 node dist/cli.js generate --in ./uploads --out ./output --model zai-coding-cn/glm-5.3-flash "根据这些材料写一份技术方案"
 ```
 
-`--in` 支持 Markdown / 纯文本 / HTML / 常见图片，以及 anydoc 能转成 Markdown 的办公格式（PDF、Word、PPT、Excel、OpenDocument、RTF、EPUB、CSV 等）。任务过程文件写在 `.inkagent/jobs/`（可用 `--work-dir` 覆盖）。扫描件 PDF 需要 OCR，第一版不覆盖。`--out` 每次生成会先清空再写入本轮 Markdown。
+`--in` 支持 Markdown / 纯文本 / HTML / 常见图片，以及 anydoc 能转成 Markdown 的办公格式（PDF、Word、PPT、Excel、OpenDocument、RTF、EPUB、CSV 等）。Word 等办公文档会抽出嵌入的位图到 `extract/` 旁的 `.assets/`；Visio 抽不成图只留说明，轴标签碎行丢掉；封面/目次在第一个一级标题前裁掉。抽取决策见 [ingest.md](.agents/spec/ingest.md)。任务过程文件写在 `.inkagent/jobs/`（可用 `--work-dir` 覆盖）。扫描件 PDF 需要 OCR，第一版不覆盖。`--out` 每次生成会先清空再写入本轮 Markdown。
 
 ## 模型选择
 

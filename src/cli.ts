@@ -2,7 +2,7 @@
 
 import { generateDocument } from './generate.js';
 import { parseCliArgs } from './cliArgs.js';
-import { listAvailableModelIds } from './agent/piAgent.js';
+import { listProjectModelIds } from './adapters/pi/configuredDocumentAgent.js';
 import { formatError } from './errors.js';
 
 async function main(): Promise<void> {
@@ -12,13 +12,13 @@ async function main(): Promise<void> {
     return;
   }
   if (parsed.kind === 'models') {
-    const ids = await listAvailableModelIds();
+    const ids = await listProjectModelIds(process.cwd());
     process.stdout.write(`${ids.join('\n')}\n`);
     return;
   }
 
   const result = await generateDocument(parsed.options);
-  process.stdout.write(`${result.outputDir}\n`);
+  process.stdout.write(`${result.outputDirectory}\n`);
 }
 
 main().catch((error: unknown) => {

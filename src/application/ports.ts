@@ -1,0 +1,91 @@
+import type { JobFailure, JobPhase } from '../domain/job.js';
+import type { MaterialExtraction, SourceFile } from '../domain/material.js';
+
+export type DocumentWorkspace = {
+  rootDirectory: string;
+  inputDirectory: string;
+  extractionDirectory: string;
+  draftDirectory: string;
+  briefFile: string;
+  manifestFile: string;
+};
+
+export type DocumentJob = {
+  id: string;
+  phase: JobPhase;
+  workspace: DocumentWorkspace;
+  extractions: readonly MaterialExtraction[];
+  failure?: JobFailure;
+};
+
+export type CreateJobRequest = {
+  jobStorageDirectory: string;
+  brief: string;
+};
+
+export type GenerationDirectories = {
+  inputDirectory: string;
+  jobStorageDirectory: string;
+  outputDirectory: string;
+};
+
+export type GenerationDirectoryValidator = {
+  validate(request: GenerationDirectories): Promise<void>;
+};
+
+export type UpdateJobPhaseRequest = {
+  job: DocumentJob;
+  phase: JobPhase;
+};
+
+export type RecordExtractionsRequest = {
+  job: DocumentJob;
+  extractions: readonly MaterialExtraction[];
+};
+
+export type FailJobRequest = {
+  job: DocumentJob;
+  error: unknown;
+};
+
+export type JobStore = {
+  createJob(request: CreateJobRequest): Promise<DocumentJob>;
+  updateJobPhase(request: UpdateJobPhaseRequest): Promise<DocumentJob>;
+  recordExtractions(request: RecordExtractionsRequest): Promise<DocumentJob>;
+  failJob(request: FailJobRequest): Promise<DocumentJob>;
+};
+
+export type CollectMaterialsRequest = {
+  inputDirectory: string;
+  workspace: DocumentWorkspace;
+};
+
+export type MaterialCollector = {
+  collect(request: CollectMaterialsRequest): Promise<readonly SourceFile[]>;
+};
+
+export type ExtractMaterialsRequest = {
+  sourceFiles: readonly SourceFile[];
+  workspace: DocumentWorkspace;
+};
+
+export type MaterialExtractor = {
+  extract(request: ExtractMaterialsRequest): Promise<readonly MaterialExtraction[]>;
+};
+
+export type DocumentAgent = {
+  generate(workspace: DocumentWorkspace): Promise<void>;
+};
+
+export type PublishDraftRequest = {
+  sourceDirectory: string;
+  targetDirectory: string;
+};
+
+export type PublishedDraft = {
+  files: readonly string[];
+};
+
+export type OutputPublisher = {
+  publish(request: PublishDraftRequest): Promise<PublishedDraft>;
+};

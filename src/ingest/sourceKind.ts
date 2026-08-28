@@ -1,24 +1,7 @@
-export const sourceKinds = [
-  'markdown',
-  'plain-text',
-  'html',
-  'image',
-  'pdf',
-  'doc',
-  'docx',
-  'ppt',
-  'pptx',
-  'xlsx',
-  'csv',
-  'odt',
-  'ods',
-  'odp',
-  'rtf',
-  'epub',
-  'unsupported',
-] as const;
+import type { SourceKind } from '../domain/material.js';
 
-export type SourceKind = (typeof sourceKinds)[number];
+export { sourceKinds } from '../domain/material.js';
+export type { SourceKind } from '../domain/material.js';
 
 const extensionToKind: Record<string, SourceKind> = {
   '.md': 'markdown',

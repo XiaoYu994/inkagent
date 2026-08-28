@@ -15,6 +15,7 @@ anydoc 的类型停在 `src/ingest/`，不泄漏到 generate / agent。
 ### 2. 图当图，表当表
 
 - 嵌入的 PNG/JPEG/GIF/WebP 写到 `extract/<kind>/….assets/`，Markdown 用相对 **job 根** 的路径（`extract/docx/…`），因为会话 cwd 是 job 目录。
+- Pi 是否把图发给模型看 `model.input` 是否含 `"image"`。项目在 `inkagent.json` 的 `pi.providers` 里按 Pi 的 models.json 写法声明模型（含 `input`）。运行时不读本机 `~/.pi/agent/models.json`，也不在会话层改 catalog。真正不支持视觉的模型可能被 API 拒掉，那时换带视觉的引用。
 - Visio 等 OLE（`.vsd`）第一版**不渲染**：不落盘、不接入 LibreOffice / libvisio。图位置只留「未能转成图片」。量值信旁边的 Word 数据表。
 - 连续 ≥3 行无标点短段落视为绘图轴标签，**直接丢掉**，不标 `layout-debris`（标了仍会进上下文，模型会当数据用）。
 - anydoc 标成 `layout` 的表加「排版框（非数据表）」前缀。封面签字栏在实测里常被标成 `data`，不能靠这个区分封面。
@@ -38,11 +39,13 @@ anydoc **没有**去封面 API。抽取前改 docx 会弄脏材料，Word 分页
 - **封面表被标成 data。** 「排版框」规则盖不住军工模板的签字栏，必须靠 H1 裁切。
 - **PDF 抽不出嵌入图资产。** 扫描件 PDF 仍不支持 OCR。
 - **Word 原生 Chart 的 `chart*.xml` 未解析。** 与 Visio OLE 不是同一条路，以后可分开做。
+- **Pi 模型目录滞后。** `glm-5.3-flash` 官方是多模态，但不在 Pi 内置表里。项目用 `inkagent.json` 的 `pi.providers` 按 Pi 格式登记，并设 `input: ["text", "image"]`。
 
 ## 自查清单
 
 - [ ] 办公抽取是否走 `toDocument`，PDF 是否仍走 `toMarkdown`？
 - [ ] 图片链接是否相对 job 根（`extract/…`），而不是相对 md 文件？
 - [ ] Visio/OLE 是否既没有落盘也没有把轴标签碎行留给模型？
+- [ ] 项目模型是否写在 `inkagent.json` 的 `pi.providers` 里（Pi 格式）？运行时是否仍在读本机 `models.json` 或自造 catalog 补丁？（那是偏离）
 - [ ] 有一级标题时，封面/目次是否在序列化前被裁掉？
 - [ ] 这次是否把「去封面」或「渲 Visio」推进了 prompt 或抽取前改 docx？那是偏离，需要写明原因。

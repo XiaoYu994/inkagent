@@ -4,50 +4,71 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { extractInputFiles } from './extract.js';
+import { extractSourceFiles } from './extract.js';
 import {
   createDocxWithParagraphs,
   createDocxWithText,
   createPdfWithText,
 } from './officeFixtures.js';
 
-describe('extractInputFiles', () => {
+describe('extractSourceFiles', () => {
   it('keeps a .markdown source name without appending another .md', async () => {
-    const { inputDir, extractDir } = await createDirs();
-    await writeFile(join(inputDir, 'notes.markdown'), '# Title\n\nbody\n');
+    const { inputDirectory, extractionDirectory } = await createDirectories();
+    await writeFile(join(inputDirectory, 'notes.markdown'), '# Title\n\nbody\n');
 
-    const records = await extractInputFiles(inputDir, extractDir, ['notes.markdown']);
+    const records = await extractSourceFiles({
+      inputDirectory,
+      extractionDirectory,
+      sourceFiles: [{ relativePath: 'notes.markdown' }],
+    });
 
-    expect(records[0]?.extractPath).toBe('markdown/notes.markdown');
-    expect(await readFile(join(extractDir, 'markdown', 'notes.markdown'), 'utf8')).toContain(
+    const extraction = records[0];
+    expect(extraction?.status).toBe('ok');
+    if (extraction?.status !== 'ok') {
+      throw new Error('notes.markdown should be extracted');
+    }
+    expect(extraction.extractedPath).toBe('markdown/notes.markdown');
+    expect(
+      await readFile(join(extractionDirectory, 'markdown', 'notes.markdown'), 'utf8'),
+    ).toContain('body');
+  });
+
+  it('copies markdown text into extract markdown', async () => {
+    const { inputDirectory, extractionDirectory } = await createDirectories();
+    await writeFile(join(inputDirectory, 'notes.md'), '# Title\n\nbody\n');
+
+    const records = await extractSourceFiles({
+      inputDirectory,
+      extractionDirectory,
+      sourceFiles: [{ relativePath: 'notes.md' }],
+    });
+
+    expect(records[0]?.status).toBe('ok');
+    expect(await readFile(join(extractionDirectory, 'markdown', 'notes.md'), 'utf8')).toContain(
       'body',
     );
   });
 
-  it('copies markdown text into extract markdown', async () => {
-    const { inputDir, extractDir } = await createDirs();
-    await writeFile(join(inputDir, 'notes.md'), '# Title\n\nbody\n');
-
-    const records = await extractInputFiles(inputDir, extractDir, ['notes.md']);
-
-    expect(records[0]?.status).toBe('ok');
-    expect(await readFile(join(extractDir, 'markdown', 'notes.md'), 'utf8')).toContain('body');
-  });
-
   it('extracts text from a pdf', async () => {
-    const { inputDir, extractDir } = await createDirs();
-    await writeFile(join(inputDir, 'a.pdf'), createPdfWithText('Hello PDF'));
+    const { inputDirectory, extractionDirectory } = await createDirectories();
+    await writeFile(join(inputDirectory, 'a.pdf'), createPdfWithText('Hello PDF'));
 
-    const records = await extractInputFiles(inputDir, extractDir, ['a.pdf']);
+    const records = await extractSourceFiles({
+      inputDirectory,
+      extractionDirectory,
+      sourceFiles: [{ relativePath: 'a.pdf' }],
+    });
 
     expect(records[0]?.status).toBe('ok');
-    expect(await readFile(join(extractDir, 'pdf', 'a.pdf.md'), 'utf8')).toContain('Hello PDF');
+    expect(await readFile(join(extractionDirectory, 'pdf', 'a.pdf.md'), 'utf8')).toContain(
+      'Hello PDF',
+    );
   });
 
   it('drops consecutive drawing fragments from a docx and keeps the caption', async () => {
-    const { inputDir, extractDir } = await createDirs();
+    const { inputDirectory, extractionDirectory } = await createDirectories();
     await writeFile(
-      join(inputDir, 'chart.docx'),
+      join(inputDirectory, 'chart.docx'),
       await createDocxWithParagraphs([
         'PSD',
         '(g2/Hz)',
@@ -58,8 +79,12 @@ describe('extractInputFiles', () => {
       ]),
     );
 
-    const records = await extractInputFiles(inputDir, extractDir, ['chart.docx']);
-    const markdown = await readFile(join(extractDir, 'docx', 'chart.docx.md'), 'utf8');
+    const records = await extractSourceFiles({
+      inputDirectory,
+      extractionDirectory,
+      sourceFiles: [{ relativePath: 'chart.docx' }],
+    });
+    const markdown = await readFile(join(extractionDirectory, 'docx', 'chart.docx.md'), 'utf8');
 
     expect(records[0]?.status).toBe('ok');
     expect(markdown).toContain('振动谱形图如图2所示。');
@@ -68,55 +93,76 @@ describe('extractInputFiles', () => {
   });
 
   it('extracts text from a docx', async () => {
-    const { inputDir, extractDir } = await createDirs();
-    await writeFile(join(inputDir, 'a.docx'), await createDocxWithText('Hello Docx'));
+    const { inputDirectory, extractionDirectory } = await createDirectories();
+    await writeFile(join(inputDirectory, 'a.docx'), await createDocxWithText('Hello Docx'));
 
-    const records = await extractInputFiles(inputDir, extractDir, ['a.docx']);
+    const records = await extractSourceFiles({
+      inputDirectory,
+      extractionDirectory,
+      sourceFiles: [{ relativePath: 'a.docx' }],
+    });
 
     expect(records[0]?.status).toBe('ok');
-    expect(await readFile(join(extractDir, 'docx', 'a.docx.md'), 'utf8')).toContain('Hello Docx');
+    expect(await readFile(join(extractionDirectory, 'docx', 'a.docx.md'), 'utf8')).toContain(
+      'Hello Docx',
+    );
   });
 
   it('extracts a csv table through anydoc', async () => {
-    const { inputDir, extractDir } = await createDirs();
-    await writeFile(join(inputDir, 'a.csv'), 'name,age\nAda,1\n');
+    const { inputDirectory, extractionDirectory } = await createDirectories();
+    await writeFile(join(inputDirectory, 'a.csv'), 'name,age\nAda,1\n');
 
-    const records = await extractInputFiles(inputDir, extractDir, ['a.csv']);
+    const records = await extractSourceFiles({
+      inputDirectory,
+      extractionDirectory,
+      sourceFiles: [{ relativePath: 'a.csv' }],
+    });
 
     expect(records[0]?.status).toBe('ok');
-    expect(await readFile(join(extractDir, 'csv', 'a.csv.md'), 'utf8')).toMatch(/Ada/);
+    expect(await readFile(join(extractionDirectory, 'csv', 'a.csv.md'), 'utf8')).toMatch(/Ada/);
   });
 
   it('copies an image through unchanged and marks the record ok', async () => {
-    const { inputDir, extractDir } = await createDirs();
+    const { inputDirectory, extractionDirectory } = await createDirectories();
     const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-    await writeFile(join(inputDir, 'logo.png'), png);
+    await writeFile(join(inputDirectory, 'logo.png'), png);
 
-    const records = await extractInputFiles(inputDir, extractDir, ['logo.png']);
+    const records = await extractSourceFiles({
+      inputDirectory,
+      extractionDirectory,
+      sourceFiles: [{ relativePath: 'logo.png' }],
+    });
 
     expect(records[0]).toMatchObject({
       status: 'ok',
       kind: 'image',
-      extractPath: 'image/logo.png',
+      extractedPath: 'image/logo.png',
     });
-    expect(await readFile(join(extractDir, 'image', 'logo.png'))).toEqual(png);
+    expect(await readFile(join(extractionDirectory, 'image', 'logo.png'))).toEqual(png);
   });
 
   it('marks unknown types as unsupported', async () => {
-    const { inputDir, extractDir } = await createDirs();
-    await writeFile(join(inputDir, 'a.bin'), 'nope');
+    const { inputDirectory, extractionDirectory } = await createDirectories();
+    await writeFile(join(inputDirectory, 'a.bin'), 'nope');
 
-    const records = await extractInputFiles(inputDir, extractDir, ['a.bin']);
+    const records = await extractSourceFiles({
+      inputDirectory,
+      extractionDirectory,
+      sourceFiles: [{ relativePath: 'a.bin' }],
+    });
 
     expect(records[0]?.status).toBe('unsupported');
   });
 });
 
-async function createDirs(): Promise<{ inputDir: string; extractDir: string }> {
+async function createDirectories(): Promise<{
+  inputDirectory: string;
+  extractionDirectory: string;
+}> {
   const root = await mkdtemp(join(tmpdir(), 'inkagent-extract-'));
-  const inputDir = join(root, 'input');
-  const extractDir = join(root, 'extract');
-  await mkdir(inputDir);
-  await mkdir(extractDir);
-  return { inputDir, extractDir };
+  const inputDirectory = join(root, 'input');
+  const extractionDirectory = join(root, 'extract');
+  await mkdir(inputDirectory);
+  await mkdir(extractionDirectory);
+  return { inputDirectory, extractionDirectory };
 }

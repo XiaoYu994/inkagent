@@ -2,104 +2,112 @@ import { mkdir, readFile, writeFile, cp } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 
 import { formatError } from '../errors.js';
+import type { MaterialExtraction, SourceFile, SourceKind } from '../domain/material.js';
 import { convertOfficeDocument, convertPdfToMarkdown, type ConvertedAsset } from './anydoc.js';
-import { detectSourceKind, isAnydocKind, type SourceKind } from './sourceKind.js';
+import { detectSourceKind, isAnydocKind } from './sourceKind.js';
 
-export type ExtractStatus = 'ok' | 'unsupported' | 'error';
+export type { MaterialExtraction, MaterialExtractionStatus } from '../domain/material.js';
 
-export type ExtractRecord = {
-  sourcePath: string;
-  kind: SourceKind;
-  status: ExtractStatus;
-  extractPath: string | undefined;
-  errorMessage: string | undefined;
+export type ExtractSourceFilesRequest = {
+  inputDirectory: string;
+  extractionDirectory: string;
+  sourceFiles: readonly SourceFile[];
 };
 
-export async function extractInputFiles(
-  inputDir: string,
-  extractDir: string,
-  sourcePaths: string[],
-): Promise<ExtractRecord[]> {
-  const records: ExtractRecord[] = [];
-  for (const sourcePath of sourcePaths) {
-    records.push(await extractOneFile(inputDir, extractDir, sourcePath));
+export async function extractSourceFiles(
+  request: ExtractSourceFilesRequest,
+): Promise<MaterialExtraction[]> {
+  const records: MaterialExtraction[] = [];
+  for (const sourceFile of request.sourceFiles) {
+    records.push(await extractOneFile(request, sourceFile));
   }
   return records;
 }
 
 async function extractOneFile(
-  inputDir: string,
-  extractDir: string,
-  sourcePath: string,
-): Promise<ExtractRecord> {
+  request: ExtractSourceFilesRequest,
+  sourceFile: SourceFile,
+): Promise<MaterialExtraction> {
+  const sourcePath = sourceFile.relativePath;
   const kind = detectSourceKind(sourcePath);
-  const absoluteSource = join(inputDir, sourcePath);
+  const absoluteSource = join(request.inputDirectory, sourcePath);
 
   if (kind === 'unsupported') {
     return {
       sourcePath,
       kind,
       status: 'unsupported',
-      extractPath: undefined,
       errorMessage: `暂不支持该文件类型: ${sourcePath}`,
     };
   }
 
   if (kind === 'image') {
-    return copyImage(extractDir, kind, sourcePath, absoluteSource);
+    return copyImage({ request, kind, sourcePath, absoluteSource });
   }
 
   try {
     const mdSuffix = kind === 'markdown' ? '' : '.md';
-    const extractPath = `${kind}/${sourcePath}${mdSuffix}`;
-    const destination = join(extractDir, extractPath);
+    const extractedPath = `${kind}/${sourcePath}${mdSuffix}`;
+    const destination = join(request.extractionDirectory, extractedPath);
     const text = isAnydocKind(kind)
-      ? await extractAnydocSource(kind, absoluteSource, destination, sourcePath)
+      ? await extractAnydocSource({ kind, absoluteSource, destination, sourcePath })
       : (await readFile(absoluteSource, 'utf8')).trim();
     await mkdir(dirname(destination), { recursive: true });
     await writeFile(destination, `${text}\n`, 'utf8');
-    return { sourcePath, kind, status: 'ok', extractPath, errorMessage: undefined };
+    return { sourcePath, kind, status: 'ok', extractedPath };
   } catch (error) {
     return {
       sourcePath,
       kind,
       status: 'error',
-      extractPath: undefined,
       errorMessage: `抽取失败 ${sourcePath}: ${formatError(error)}`,
     };
   }
 }
 
-async function copyImage(
-  extractDir: string,
-  kind: SourceKind,
-  sourcePath: string,
-  absoluteSource: string,
-): Promise<ExtractRecord> {
-  const extractPath = `${kind}/${sourcePath}`;
-  const destination = join(extractDir, extractPath);
+type CopyImageRequest = {
+  request: ExtractSourceFilesRequest;
+  kind: SourceKind;
+  sourcePath: string;
+  absoluteSource: string;
+};
+
+async function copyImage({
+  request,
+  kind,
+  sourcePath,
+  absoluteSource,
+}: CopyImageRequest): Promise<MaterialExtraction> {
+  const extractedPath = `${kind}/${sourcePath}`;
+  const destination = join(request.extractionDirectory, extractedPath);
 
   try {
     await mkdir(dirname(destination), { recursive: true });
     await cp(absoluteSource, destination);
-    return { sourcePath, kind: 'image', status: 'ok', extractPath, errorMessage: undefined };
+    return { sourcePath, kind: 'image', status: 'ok', extractedPath };
   } catch (error) {
     return {
       sourcePath,
       kind: 'image',
       status: 'error',
-      extractPath: undefined,
       errorMessage: `复制图片失败 ${sourcePath}: ${formatError(error)}`,
     };
   }
 }
 
-async function extractAnydocSource(
-  kind: SourceKind,
-  absoluteSource: string,
-  destination: string,
-  sourcePath: string,
-): Promise<string> {
+type ExtractAnydocSourceRequest = {
+  kind: SourceKind;
+  absoluteSource: string;
+  destination: string;
+  sourcePath: string;
+};
+
+async function extractAnydocSource({
+  kind,
+  absoluteSource,
+  destination,
+  sourcePath,
+}: ExtractAnydocSourceRequest): Promise<string> {
   if (kind === 'pdf') {
     return convertPdfToMarkdown(absoluteSource);
   }
@@ -107,13 +115,23 @@ async function extractAnydocSource(
   const assetFolder = `${basename(sourcePath)}.assets`;
   const converted = await convertOfficeDocument(
     absoluteSource,
-    assetHrefDir(kind, sourcePath, assetFolder),
+    createAssetHref({ kind, sourcePath, assetFolder }),
   );
-  await writeConvertedAssets(dirname(destination), converted.assets, assetFolder);
+  await writeConvertedAssets({
+    directory: dirname(destination),
+    assets: converted.assets,
+    assetDirectoryName: assetFolder,
+  });
   return converted.markdown;
 }
 
-function assetHrefDir(kind: SourceKind, sourcePath: string, assetFolder: string): string {
+type AssetHrefRequest = {
+  kind: SourceKind;
+  sourcePath: string;
+  assetFolder: string;
+};
+
+function createAssetHref({ kind, sourcePath, assetFolder }: AssetHrefRequest): string {
   const parent = dirname(sourcePath).replaceAll('\\', '/');
   if (parent === '.') {
     return `extract/${kind}/${assetFolder}`;
@@ -121,11 +139,17 @@ function assetHrefDir(kind: SourceKind, sourcePath: string, assetFolder: string)
   return `extract/${kind}/${parent}/${assetFolder}`;
 }
 
-async function writeConvertedAssets(
-  directory: string,
-  assets: ConvertedAsset[],
-  assetDirectoryName: string,
-): Promise<void> {
+type WriteConvertedAssetsRequest = {
+  directory: string;
+  assets: ConvertedAsset[];
+  assetDirectoryName: string;
+};
+
+async function writeConvertedAssets({
+  directory,
+  assets,
+  assetDirectoryName,
+}: WriteConvertedAssetsRequest): Promise<void> {
   if (assets.length === 0) {
     return;
   }

@@ -1,0 +1,109 @@
+import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
+
+import type {
+  CreateJobRequest,
+  DocumentJob,
+  DocumentWorkspace,
+  FailJobRequest,
+  JobStore,
+  RecordExtractionsRequest,
+  UpdateJobPhaseRequest,
+} from '../../application/ports.js';
+import { formatError, InkAgentError } from '../../errors.js';
+
+export const fileSystemJobStore: JobStore = {
+  createJob,
+  updateJobPhase,
+  recordExtractions,
+  failJob,
+};
+
+async function createJob(request: CreateJobRequest): Promise<DocumentJob> {
+  const jobId = randomUUID();
+  const workspace = createWorkspace(request.jobStorageDirectory, jobId);
+  await createWorkspaceDirectories(workspace);
+  await writeTextFile(workspace.briefFile, `${request.brief}\n`);
+
+  const job = createJobRecord(jobId, workspace);
+  await writeJobFile(job);
+  return job;
+}
+
+async function updateJobPhase(request: UpdateJobPhaseRequest): Promise<DocumentJob> {
+  const job = { ...request.job, phase: request.phase };
+  await writeJobFile(job);
+  return job;
+}
+
+async function recordExtractions(request: RecordExtractionsRequest): Promise<DocumentJob> {
+  const job = { ...request.job, extractions: [...request.extractions] };
+  await writeJsonFile(job.workspace.manifestFile, {
+    jobId: job.id,
+    extracts: job.extractions,
+  });
+  await writeJobFile(job);
+  return job;
+}
+
+async function failJob(request: FailJobRequest): Promise<DocumentJob> {
+  const job: DocumentJob = {
+    ...request.job,
+    phase: 'failed',
+    failure: {
+      phase: request.job.phase,
+      message: formatError(request.error),
+    },
+  };
+  await writeJobFile(job);
+  return job;
+}
+
+function createJobRecord(jobId: string, workspace: DocumentWorkspace): DocumentJob {
+  return {
+    id: jobId,
+    phase: 'created',
+    workspace,
+    extractions: [],
+  };
+}
+
+function createWorkspace(parentDirectory: string, jobId: string): DocumentWorkspace {
+  const rootDirectory = join(parentDirectory, jobId);
+  return {
+    rootDirectory,
+    inputDirectory: join(rootDirectory, 'input'),
+    extractionDirectory: join(rootDirectory, 'extract'),
+    draftDirectory: join(rootDirectory, 'draft'),
+    briefFile: join(rootDirectory, 'brief.md'),
+    manifestFile: join(rootDirectory, 'manifest.json'),
+  };
+}
+
+async function createWorkspaceDirectories(workspace: DocumentWorkspace): Promise<void> {
+  await Promise.all([
+    mkdir(workspace.inputDirectory, { recursive: true }),
+    mkdir(workspace.extractionDirectory, { recursive: true }),
+    mkdir(workspace.draftDirectory, { recursive: true }),
+  ]);
+}
+
+async function writeJobFile(job: DocumentJob): Promise<void> {
+  await writeJsonFile(join(job.workspace.rootDirectory, 'job.json'), job);
+}
+
+async function writeJsonFile(filePath: string, value: unknown): Promise<void> {
+  await writeTextFile(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+async function writeTextFile(filePath: string, content: string): Promise<void> {
+  const temporaryFile = `${filePath}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temporaryFile, content, 'utf8');
+    await rename(temporaryFile, filePath);
+  } catch (error) {
+    await rm(temporaryFile, { force: true });
+    throw new InkAgentError(`写入任务文件失败: ${filePath}`, { cause: error });
+  }
+}

@@ -24,10 +24,10 @@ npm run format:check
 
 ```bash
 npm run build
-node dist/cli.js generate --in ./uploads --out ./output --model zai-coding-cn/glm-5.3-flash "根据这些材料写一份技术方案"
+node dist/cli.js generate --input-directory ./uploads --output-directory ./output --model zai-coding-cn/glm-5.3-flash "根据这些材料写一份技术方案"
 ```
 
-`--in` 支持 Markdown / 纯文本 / HTML / 常见图片，以及 anydoc 能转成 Markdown 的办公格式（PDF、Word、PPT、Excel、OpenDocument、RTF、EPUB、CSV 等）。Word 等办公文档会抽出嵌入的位图到 `extract/` 旁的 `.assets/`；Visio 抽不成图只留说明，轴标签碎行丢掉；封面/目次在第一个一级标题前裁掉。抽取决策见 [ingest.md](.agents/spec/ingest.md)。任务过程文件写在 `.inkagent/jobs/`（可用 `--work-dir` 覆盖）。扫描件 PDF 需要 OCR，第一版不覆盖。`--out` 每次生成会先清空再写入本轮 Markdown。
+输入目录支持 Markdown、纯文本、HTML、常见图片，以及 anydoc 能转成 Markdown 的办公格式（PDF、Word、PPT、Excel、OpenDocument、RTF、EPUB、CSV 等）。Word 等办公文档会抽出嵌入的位图到任务目录的 `extract/` 旁的 `.assets/`；Visio 抽不成图只留说明，轴标签碎行丢掉；封面/目次在第一个一级标题前裁掉。抽取决策见 [ingest.md](.agents/spec/ingest.md)。任务过程文件写在 `.inkagent/jobs/`（可用 `--job-directory` 覆盖）。输入、任务和输出目录不能互相包含。扫描件 PDF 需要 OCR，第一版不覆盖。输出会先写入临时目录，校验通过后替换目标目录。
 
 ## 模型选择
 
@@ -39,9 +39,28 @@ node dist/cli.js generate --in ./uploads --out ./output --model zai-coding-cn/gl
    ```json
    {
      "model": "zai-coding-cn/glm-5.3-flash",
-     "thinkingLevel": "xhigh"
+     "thinkingLevel": "xhigh",
+     "pi": {
+       "providers": {
+         "zai-coding-cn": {
+           "models": [
+             {
+               "id": "glm-5.3-flash",
+               "name": "GLM-5.3 Flash",
+               "reasoning": true,
+               "input": ["text", "image"],
+               "cost": { "input": 0.15, "output": 0.5, "cacheRead": 0.03, "cacheWrite": 0 },
+               "contextWindow": 1000000,
+               "maxTokens": 131072
+             }
+           ]
+         }
+       }
+     }
    }
    ```
+
+   `pi.providers` 与 Pi 的 `models.json` 同形，原样交给 Pi。`input` 含 `"image"` 时，agent 读位图会把图发给模型。运行时**不会**读取本机 `~/.pi/agent/models.json`。
 
 列出当前密钥下可用的模型：
 

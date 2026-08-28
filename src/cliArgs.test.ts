@@ -4,14 +4,14 @@ import { parseCliArgs } from './cliArgs.js';
 import { InkAgentError } from './errors.js';
 
 describe('parseCliArgs', () => {
-  it('reads in out work-dir and brief', () => {
+  it('reads input, output, job storage, and brief', () => {
     const parsed = parseCliArgs([
       'generate',
-      '--in',
+      '--input-directory',
       './uploads',
-      '--out',
+      '--output-directory',
       './output',
-      '--work-dir',
+      '--job-directory',
       './tmp',
       '写一份技术方案',
     ]);
@@ -19,9 +19,9 @@ describe('parseCliArgs', () => {
     expect(parsed).toMatchObject({
       kind: 'generate',
       options: {
-        inputDir: './uploads',
-        outputDir: './output',
-        workDir: './tmp',
+        inputDirectory: './uploads',
+        outputDirectory: './output',
+        jobStorageDirectory: './tmp',
         brief: '写一份技术方案',
       },
     });
@@ -32,16 +32,16 @@ describe('parseCliArgs', () => {
     expect(parseCliArgs(['--help']).kind).toBe('help');
     const generateHelp = parseCliArgs(['generate', '--help']);
     expect(generateHelp.kind).toBe('help');
-    expect(generateHelp.kind === 'help' && generateHelp.text).toContain('--work-dir');
+    expect(generateHelp.kind === 'help' && generateHelp.text).toContain('--job-directory');
     expect(generateHelp.kind === 'help' && generateHelp.text).toContain('<brief>');
   });
 
   it('reads model and thinking-level flags', () => {
     const parsed = parseCliArgs([
       'generate',
-      '--in',
+      '--input-directory',
       './uploads',
-      '--out',
+      '--output-directory',
       './output',
       '--model',
       'openrouter/vendor/model',
@@ -65,7 +65,16 @@ describe('parseCliArgs', () => {
 
   it('rejects an unknown thinking level', () => {
     expect(() =>
-      parseCliArgs(['generate', '--in', 'a', '--out', 'b', '--thinking-level', 'turbo', '写文档']),
+      parseCliArgs([
+        'generate',
+        '--input-directory',
+        'a',
+        '--output-directory',
+        'b',
+        '--thinking-level',
+        'turbo',
+        '写文档',
+      ]),
     ).toThrow(InkAgentError);
   });
 
@@ -79,10 +88,12 @@ describe('parseCliArgs', () => {
   });
 
   it('rejects missing generate command', () => {
-    expect(() => parseCliArgs(['--in', 'a'])).toThrow(InkAgentError);
+    expect(() => parseCliArgs(['--input-directory', 'a'])).toThrow(InkAgentError);
   });
 
   it('rejects missing brief text', () => {
-    expect(() => parseCliArgs(['generate', '--in', 'a', '--out', 'b'])).toThrow(/brief/);
+    expect(() =>
+      parseCliArgs(['generate', '--input-directory', 'a', '--output-directory', 'b']),
+    ).toThrow(/brief/);
   });
 });

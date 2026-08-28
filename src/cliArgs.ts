@@ -1,7 +1,7 @@
 import { parseArgs } from 'node:util';
 
 import { InkAgentError, formatError } from './errors.js';
-import { thinkingLevels, type ThinkingLevel } from './projectConfig.js';
+import { thinkingLevels, type ThinkingLevel } from './domain/thinkingLevel.js';
 import type { GenerateDocumentOptions } from './generate.js';
 
 export type ParsedCliArgs =
@@ -39,10 +39,10 @@ function parseGenerateCommand(args: string[]): ParsedCliArgs {
     return { kind: 'help', text: usageText() };
   }
 
-  const inputDir = values.in;
-  const outputDir = values.out;
-  if (!inputDir || !outputDir) {
-    throw new InkAgentError(invalidWithUsage('必须提供 --in 与 --out'));
+  const inputDirectory = values['input-directory'];
+  const outputDirectory = values['output-directory'];
+  if (!inputDirectory || !outputDirectory) {
+    throw new InkAgentError(invalidWithUsage('必须提供 --input-directory 与 --output-directory'));
   }
 
   const brief = positionals.join(' ').trim();
@@ -50,7 +50,7 @@ function parseGenerateCommand(args: string[]): ParsedCliArgs {
     throw new InkAgentError(invalidWithUsage('必须提供 brief 文本'));
   }
 
-  const workDir = values['work-dir'];
+  const jobStorageDirectory = values['job-directory'];
   const model = values.model;
   const thinkingLevel = values['thinking-level'];
   if (thinkingLevel !== undefined && !thinkingLevels.some((level) => level === thinkingLevel)) {
@@ -62,10 +62,10 @@ function parseGenerateCommand(args: string[]): ParsedCliArgs {
   return {
     kind: 'generate',
     options: {
-      inputDir,
-      outputDir,
+      inputDirectory,
+      outputDirectory,
       brief,
-      ...(workDir === undefined ? {} : { workDir }),
+      ...(jobStorageDirectory === undefined ? {} : { jobStorageDirectory }),
       ...(model === undefined ? {} : { model }),
       ...(thinkingLevel === undefined ? {} : { thinkingLevel: thinkingLevel as ThinkingLevel }),
     },
@@ -75,9 +75,9 @@ function parseGenerateCommand(args: string[]): ParsedCliArgs {
 function parseGenerateFlags(args: string[]): {
   values: {
     help?: boolean;
-    in?: string;
-    out?: string;
-    'work-dir'?: string;
+    'input-directory'?: string;
+    'output-directory'?: string;
+    'job-directory'?: string;
     model?: string;
     'thinking-level'?: string;
   };
@@ -89,18 +89,18 @@ function parseGenerateFlags(args: string[]): {
       allowPositionals: true,
       options: {
         help: { type: 'boolean', short: 'h' },
-        in: { type: 'string' },
-        out: { type: 'string' },
-        'work-dir': { type: 'string' },
+        'input-directory': { type: 'string' },
+        'output-directory': { type: 'string' },
+        'job-directory': { type: 'string' },
         model: { type: 'string' },
         'thinking-level': { type: 'string' },
       },
     }) as {
       values: {
         help?: boolean;
-        in?: string;
-        out?: string;
-        'work-dir'?: string;
+        'input-directory'?: string;
+        'output-directory'?: string;
+        'job-directory'?: string;
         model?: string;
         'thinking-level'?: string;
       };
@@ -122,13 +122,13 @@ function invalidWithUsage(reason: string): string {
 function usageText(): string {
   return [
     '用法:',
-    '  inkagent generate --in <目录> --out <目录> [--model <引用>] <brief>',
+    '  inkagent generate --input-directory <目录> --output-directory <目录> [--model <引用>] <brief>',
     '  inkagent models',
     '',
     '选项:',
-    '  --in <目录>       输入材料目录（必填）',
-    '  --out <目录>      终稿输出目录（必填）',
-    '  --work-dir <目录> 任务过程文件目录，默认 ./.inkagent/jobs',
+    '  --input-directory <目录>  输入材料目录（必填）',
+    '  --output-directory <目录> 终稿输出目录（必填）',
+    '  --job-directory <目录>     任务过程文件目录，默认 ./.inkagent/jobs',
     '  --model <引用>     指定模型（provider/modelId）。未传时读 inkagent.json，不再使用 Pi 全局默认',
     '  --thinking-level <档> off/minimal/low/medium/high/xhigh/max',
     '  -h, --help        显示本帮助',

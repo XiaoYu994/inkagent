@@ -68,6 +68,7 @@ class DocumentGenerationRun {
     this.currentJob = await this.dependencies.jobStore.createJob({
       jobStorageDirectory: this.request.jobStorageDirectory,
       brief,
+      outputDirectory: this.request.outputDirectory,
     });
     await this.collectAndExtractMaterials();
     assertMaterialsUsable(this.getCurrentJob().extractions);
@@ -102,6 +103,7 @@ class DocumentGenerationRun {
     const publishedDraft = await this.dependencies.outputPublisher.publish({
       sourceDirectory: this.getCurrentJob().workspace.draftDirectory,
       targetDirectory: this.request.outputDirectory,
+      assetSourceDirectory: this.getCurrentJob().workspace.extractionDirectory,
     });
     await this.advanceTo('succeeded');
     return {
@@ -122,10 +124,14 @@ class DocumentGenerationRun {
     if (this.currentJob === undefined) {
       return;
     }
-    this.currentJob = await this.dependencies.jobStore.failJob({
-      job: this.currentJob,
-      error,
-    });
+    try {
+      this.currentJob = await this.dependencies.jobStore.failJob({
+        job: this.currentJob,
+        error,
+      });
+    } catch {
+      // Preserve the original generation error when failure reporting cannot be persisted.
+    }
   }
 
   private getCurrentJob(): DocumentJob {
@@ -133,6 +139,66 @@ class DocumentGenerationRun {
       throw new InkAgentError('文档任务尚未创建');
     }
     return this.currentJob;
+  }
+}
+
+export type RetryDocumentRequest = {
+  jobId: string;
+  jobStorageDirectory: string;
+};
+
+export type DocumentRetry = {
+  execute(request: RetryDocumentRequest): Promise<GenerateDocumentResult>;
+};
+
+export function createDocumentRetry(dependencies: DocumentGenerationDependencies): DocumentRetry {
+  return {
+    execute: (request) => retryDocument(dependencies, request),
+  };
+}
+
+async function retryDocument(
+  dependencies: DocumentGenerationDependencies,
+  request: RetryDocumentRequest,
+): Promise<GenerateDocumentResult> {
+  let job = await dependencies.jobStore.getJob(request.jobId, request.jobStorageDirectory);
+  assertRetryableJob(job);
+  try {
+    if (job.failure?.phase === 'generating') {
+      job = await dependencies.jobStore.updateJobPhase({ job, phase: 'generating' });
+      await dependencies.documentAgent.generate(job.workspace);
+    }
+    job = await dependencies.jobStore.updateJobPhase({ job, phase: 'publishing' });
+    const publishedDraft = await dependencies.outputPublisher.publish({
+      sourceDirectory: job.workspace.draftDirectory,
+      targetDirectory: job.outputDirectory,
+      assetSourceDirectory: job.workspace.extractionDirectory,
+    });
+    job = await dependencies.jobStore.updateJobPhase({ job, phase: 'succeeded' });
+    return {
+      job,
+      outputDirectory: job.outputDirectory,
+      outputFiles: publishedDraft.files,
+    };
+  } catch (error) {
+    try {
+      job = await dependencies.jobStore.failJob({ job, error });
+    } catch {
+      // Preserve the operational error when failure reporting cannot be persisted.
+    }
+    throw error;
+  }
+}
+
+function assertRetryableJob(job: DocumentJob): void {
+  if (job.phase !== 'failed' || job.failure === undefined) {
+    throw new InkAgentError(`任务 ${job.id} 当前不可重试: phase=${job.phase}`);
+  }
+  if (job.failure.phase !== 'generating' && job.failure.phase !== 'publishing') {
+    throw new InkAgentError(`任务 ${job.id} 失败于 ${job.failure.phase}，需要重新生成任务`);
+  }
+  if (job.extractions.every((extraction) => extraction.status !== 'ok')) {
+    throw new InkAgentError(`任务 ${job.id} 没有可复用的抽取结果`);
   }
 }
 

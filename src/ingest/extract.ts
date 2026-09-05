@@ -52,6 +52,9 @@ async function extractOneFile(
     const text = isAnydocKind(kind)
       ? await extractAnydocSource({ kind, absoluteSource, destination, sourcePath })
       : (await readFile(absoluteSource, 'utf8')).trim();
+    if (text.trim().length === 0) {
+      throw new Error('文件内容为空');
+    }
     await mkdir(dirname(destination), { recursive: true });
     await writeFile(destination, `${text}\n`, 'utf8');
     return { sourcePath, kind, status: 'ok', extractedPath };

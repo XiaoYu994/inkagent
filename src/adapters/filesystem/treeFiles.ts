@@ -1,4 +1,4 @@
-import { cp, lstat, mkdir, readdir, realpath, rm, stat } from 'node:fs/promises';
+import { cp, lstat, mkdir, readFile, readdir, realpath, rm, stat } from 'node:fs/promises';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 
 import { InkAgentError, isEnoentError } from '../../errors.js';
@@ -38,6 +38,32 @@ export async function copyMarkdownTree(request: CopyTreeRequest): Promise<string
     await copyTreeFile(file, request.targetDirectory);
   }
   return files.map((file) => file.relativePath).sort();
+}
+
+export async function copyNonMarkdownTree(request: CopyTreeRequest): Promise<string[]> {
+  const files = (await listTreeFiles(request.sourceDirectory)).filter(
+    (file) => !hasHiddenPathSegment(file.relativePath) && !isMarkdownPath(file.relativePath),
+  );
+  for (const file of files) {
+    await copyTreeFile(file, request.targetDirectory);
+  }
+  return files.map((file) => file.relativePath).sort();
+}
+
+export async function validateMarkdownTree(sourceDirectory: string): Promise<void> {
+  const files = (await listTreeFiles(sourceDirectory)).filter(
+    (file) => !hasHiddenPathSegment(file.relativePath) && isMarkdownPath(file.relativePath),
+  );
+  if (files.length === 0) {
+    throw new InkAgentError(`agent 没有在 ${sourceDirectory} 写出任何 Markdown`);
+  }
+  for (const file of files) {
+    const content = await readFile(file.realPath, 'utf8');
+    if (content.trim().length === 0) {
+      throw new InkAgentError(`agent 写出的 Markdown 为空: ${file.relativePath}`);
+    }
+    await assertLocalMarkdownReferences(content, sourceDirectory, file.relativePath);
+  }
 }
 
 export async function assertOutputDirectoryUsable(outputDirectory: string): Promise<void> {
@@ -121,6 +147,36 @@ function hasHiddenPathSegment(relativePath: string): boolean {
 
 function isMarkdownPath(relativePath: string): boolean {
   return relativePath.toLowerCase().endsWith('.md');
+}
+
+async function assertLocalMarkdownReferences(
+  content: string,
+  sourceDirectory: string,
+  relativeMarkdownPath: string,
+): Promise<void> {
+  const referencePattern = /!?\[[^\]]*\]\(([^)]+)\)/g;
+  for (const match of content.matchAll(referencePattern)) {
+    const reference = match[1]?.trim().replace(/^<|>$/g, '');
+    if (reference === undefined || isExternalReference(reference)) {
+      continue;
+    }
+    const targetPath = resolve(dirname(join(sourceDirectory, relativeMarkdownPath)), reference);
+    try {
+      const targetStats = await stat(targetPath);
+      if (!targetStats.isFile()) {
+        throw new Error('不是文件');
+      }
+    } catch (error) {
+      throw new InkAgentError(
+        `Markdown 引用了不存在的本地文件: ${relativeMarkdownPath} -> ${reference}`,
+        { cause: error },
+      );
+    }
+  }
+}
+
+function isExternalReference(reference: string): boolean {
+  return reference.startsWith('#') || /^[a-z][a-z\d+.-]*:/i.test(reference);
 }
 
 export async function removeDirectory(directory: string): Promise<void> {

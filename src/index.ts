@@ -1,11 +1,17 @@
 export { InkAgentError } from './errors.js';
-export { generateDocument } from './generate.js';
-export type { GenerateDocumentOptions, GenerateDocumentResult } from './generate.js';
+export { generateDocument, readDocumentJob, retryDocument } from './generate.js';
+export type {
+  GenerateDocumentOptions,
+  GenerateDocumentResult,
+  RetryDocumentOptions,
+} from './generate.js';
 export { createDocumentGeneration } from './application/documentGeneration.js';
 export type {
   DocumentGeneration,
   DocumentGenerationDependencies,
   GenerateDocumentRequest as DocumentGenerationRequest,
+  DocumentRetry,
+  RetryDocumentRequest,
 } from './application/documentGeneration.js';
 export type {
   DocumentAgent,

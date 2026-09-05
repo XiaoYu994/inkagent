@@ -63,6 +63,22 @@ describe('parseCliArgs', () => {
     expect(parseCliArgs(['models'])).toEqual({ kind: 'models' });
   });
 
+  it('parses status and retry commands', () => {
+    expect(parseCliArgs(['status', '--job-directory', './jobs', 'job-1'])).toEqual({
+      kind: 'status',
+      jobId: 'job-1',
+      jobStorageDirectory: './jobs',
+    });
+    expect(
+      parseCliArgs(['retry', '--model', 'provider/model', '--thinking-level', 'high', 'job-1']),
+    ).toEqual({
+      kind: 'retry',
+      jobId: 'job-1',
+      model: 'provider/model',
+      thinkingLevel: 'high',
+    });
+  });
+
   it('rejects an unknown thinking level', () => {
     expect(() =>
       parseCliArgs([

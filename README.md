@@ -27,7 +27,19 @@ npm run build
 node dist/cli.js generate --input-directory ./uploads --output-directory ./output --model zai-coding-cn/glm-5.3-flash "根据这些材料写一份技术方案"
 ```
 
-输入目录支持 Markdown、纯文本、HTML、常见图片，以及 anydoc 能转成 Markdown 的办公格式（PDF、Word、PPT、Excel、OpenDocument、RTF、EPUB、CSV 等）。Word 等办公文档会抽出嵌入的位图到任务目录的 `extract/` 旁的 `.assets/`；Visio 抽不成图只留说明，轴标签碎行丢掉；封面/目次在第一个一级标题前裁掉。抽取决策见 [ingest.md](.agents/spec/ingest.md)。任务过程文件写在 `.inkagent/jobs/`（可用 `--job-directory` 覆盖）。输入、任务和输出目录不能互相包含。扫描件 PDF 需要 OCR，第一版不覆盖。输出会先写入临时目录，校验通过后替换目标目录。
+输入目录支持 Markdown、纯文本、HTML、常见图片，以及 anydoc 能转成 Markdown 的办公格式（PDF、Word、PPT、Excel、OpenDocument、RTF、EPUB、CSV 等）。Word 等办公文档会抽出嵌入的位图到任务目录的 `extract/` 旁的 `.assets/`；发布时这些资产会一并输出到 `extract/`，使终稿中的图片链接可用。Visio 抽不成图只留说明，轴标签碎行丢掉；封面/目次在第一个一级标题前裁掉。抽取决策见 [ingest.md](.agents/spec/ingest.md)。任务过程文件写在 `.inkagent/jobs/`（可用 `--job-directory` 覆盖）。输入、任务和输出目录不能互相包含。扫描件 PDF 需要 OCR，第一版不覆盖。输出会先写入临时目录，校验 Markdown 非空且本地引用完整后替换目标目录。
+
+任务支持失败后恢复：
+
+```bash
+# 查看任务状态
+node dist/cli.js status <job-id>
+
+# 从抽取完成后的任务继续（模型失败或发布失败）
+node dist/cli.js retry <job-id> --model zai-coding-cn/glm-5.3-flash
+```
+
+`retry` 只复用已持久化且包含可用抽取结果的任务；收集或抽取阶段失败需要重新执行 `generate`。任务记录保存在任务目录的 `job.json`，其中包含目标输出目录，因此恢复时不需要重新提供输出路径。
 
 ## 模型选择
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { generateDocument } from './generate.js';
+import { generateDocument, readDocumentJob, retryDocument } from './generate.js';
 import { parseCliArgs } from './cliArgs.js';
 import { listProjectModelIds } from './adapters/pi/configuredDocumentAgent.js';
 import { formatError } from './errors.js';
@@ -14,6 +14,20 @@ async function main(): Promise<void> {
   if (parsed.kind === 'models') {
     const ids = await listProjectModelIds(process.cwd());
     process.stdout.write(`${ids.join('\n')}\n`);
+    return;
+  }
+  if (parsed.kind === 'status') {
+    const job = await readDocumentJob(parsed.jobId, {
+      ...(parsed.jobStorageDirectory === undefined
+        ? {}
+        : { jobStorageDirectory: parsed.jobStorageDirectory }),
+    });
+    process.stdout.write(`${JSON.stringify(job, null, 2)}\n`);
+    return;
+  }
+  if (parsed.kind === 'retry') {
+    const result = await retryDocument(parsed);
+    process.stdout.write(`${result.outputDirectory}\n`);
     return;
   }
 

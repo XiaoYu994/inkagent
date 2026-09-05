@@ -7,6 +7,14 @@ import type { GenerateDocumentOptions } from './generate.js';
 export type ParsedCliArgs =
   | { kind: 'help'; text: string }
   | { kind: 'models' }
+  | { kind: 'status'; jobId: string; jobStorageDirectory?: string }
+  | {
+      kind: 'retry';
+      jobId: string;
+      jobStorageDirectory?: string;
+      model?: string;
+      thinkingLevel?: ThinkingLevel;
+    }
   | { kind: 'generate'; options: GenerateDocumentOptions };
 
 export function parseCliArgs(argv: string[]): ParsedCliArgs {
@@ -17,10 +25,60 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
   if (command === 'models') {
     return parseModelsCommand(rest);
   }
+  if (command === 'status') {
+    return parseJobCommand('status', rest);
+  }
+  if (command === 'retry') {
+    return parseRetryCommand(rest);
+  }
   if (command !== 'generate') {
-    throw new InkAgentError(invalidWithUsage('第一个参数必须是 generate 或 models'));
+    throw new InkAgentError(invalidWithUsage('第一个参数必须是 generate、models、status 或 retry'));
   }
   return parseGenerateCommand(rest);
+}
+
+function parseJobCommand(command: 'status', args: string[]): ParsedCliArgs {
+  const { values, positionals } = parseJobFlags(args);
+  if (values.help) {
+    return { kind: 'help', text: usageText() };
+  }
+  const [jobId] = positionals;
+  if (jobId === undefined || positionals.length !== 1) {
+    throw new InkAgentError(invalidWithUsage(`${command} 必须提供一个 job-id`));
+  }
+  return {
+    kind: 'status',
+    jobId,
+    ...(values['job-directory'] === undefined
+      ? {}
+      : { jobStorageDirectory: values['job-directory'] as string }),
+  };
+}
+
+function parseRetryCommand(args: string[]): ParsedCliArgs {
+  const { values, positionals } = parseRetryFlags(args);
+  if (values.help) {
+    return { kind: 'help', text: usageText() };
+  }
+  const [jobId] = positionals;
+  if (jobId === undefined || positionals.length !== 1) {
+    throw new InkAgentError(invalidWithUsage('retry 必须提供一个 job-id'));
+  }
+  const thinkingLevel = values['thinking-level'];
+  if (thinkingLevel !== undefined && !thinkingLevels.some((level) => level === thinkingLevel)) {
+    throw new InkAgentError(
+      invalidWithUsage(`--thinking-level 只支持: ${thinkingLevels.join(' / ')}`),
+    );
+  }
+  return {
+    kind: 'retry',
+    jobId,
+    ...(values['job-directory'] === undefined
+      ? {}
+      : { jobStorageDirectory: values['job-directory'] as string }),
+    ...(values.model === undefined ? {} : { model: values.model as string }),
+    ...(thinkingLevel === undefined ? {} : { thinkingLevel: thinkingLevel as ThinkingLevel }),
+  };
 }
 
 function parseModelsCommand(args: string[]): ParsedCliArgs {
@@ -111,6 +169,33 @@ function parseGenerateFlags(args: string[]): {
   }
 }
 
+function parseJobFlags(args: string[]) {
+  return parseCommandFlags(args, { 'job-directory': { type: 'string' } });
+}
+
+function parseRetryFlags(args: string[]) {
+  return parseCommandFlags(args, {
+    'job-directory': { type: 'string' },
+    model: { type: 'string' },
+    'thinking-level': { type: 'string' },
+  });
+}
+
+function parseCommandFlags(
+  args: string[],
+  commandOptions: Record<string, { type: 'string' }>,
+): { values: Record<string, string | boolean | undefined>; positionals: string[] } {
+  try {
+    return parseArgs({
+      args,
+      allowPositionals: true,
+      options: { help: { type: 'boolean', short: 'h' }, ...commandOptions },
+    }) as { values: Record<string, string | boolean | undefined>; positionals: string[] };
+  } catch (error) {
+    throw new InkAgentError(invalidWithUsage(formatError(error)), { cause: error });
+  }
+}
+
 function isHelpToken(token: string): boolean {
   return token === '-h' || token === '--help' || token === 'help';
 }
@@ -124,6 +209,8 @@ function usageText(): string {
     '用法:',
     '  inkagent generate --input-directory <目录> --output-directory <目录> [--model <引用>] <brief>',
     '  inkagent models',
+    '  inkagent status [--job-directory <目录>] <job-id>',
+    '  inkagent retry [--job-directory <目录>] [--model <引用>] <job-id>',
     '',
     '选项:',
     '  --input-directory <目录>  输入材料目录（必填）',

@@ -4,6 +4,7 @@ import { createConfiguredDocumentAgent } from './adapters/pi/configuredDocumentA
 import type { DocumentAgent } from './application/ports.js';
 import {
   createDocumentGeneration,
+  createDocumentRetry,
   type GenerateDocumentResult as ApplicationGenerateDocumentResult,
 } from './application/documentGeneration.js';
 import { fileSystemDirectoryValidator } from './adapters/filesystem/directoryValidator.js';
@@ -25,6 +26,14 @@ export type GenerateDocumentOptions = {
 
 export type GenerateDocumentResult = ApplicationGenerateDocumentResult;
 
+export type RetryDocumentOptions = {
+  jobId: string;
+  jobStorageDirectory?: string;
+  projectDirectory?: string;
+  model?: string;
+  thinkingLevel?: ThinkingLevel;
+};
+
 export async function generateDocument(
   options: GenerateDocumentOptions,
 ): Promise<GenerateDocumentResult> {
@@ -41,8 +50,43 @@ export async function generateDocument(
   });
 }
 
+export async function retryDocument(
+  options: RetryDocumentOptions,
+): Promise<GenerateDocumentResult> {
+  const projectDirectory = options.projectDirectory ?? process.cwd();
+  const jobStorageDirectory =
+    options.jobStorageDirectory ?? join(projectDirectory, '.inkagent', 'jobs');
+  const documentAgent = createLazyDocumentAgent(() =>
+    resolveDocumentAgent(options, projectDirectory),
+  );
+  return createDocumentRetry(createFileSystemDependencies(documentAgent)).execute({
+    jobId: options.jobId,
+    jobStorageDirectory,
+  });
+}
+
+function createLazyDocumentAgent(loadAgent: () => Promise<DocumentAgent>): DocumentAgent {
+  let agent: DocumentAgent | undefined;
+  return {
+    async generate(workspace) {
+      agent ??= await loadAgent();
+      await agent.generate(workspace);
+    },
+  };
+}
+
+export async function readDocumentJob(
+  jobId: string,
+  options: Pick<RetryDocumentOptions, 'jobStorageDirectory' | 'projectDirectory'> = {},
+) {
+  const projectDirectory = options.projectDirectory ?? process.cwd();
+  const jobStorageDirectory =
+    options.jobStorageDirectory ?? join(projectDirectory, '.inkagent', 'jobs');
+  return fileSystemJobStore.getJob(jobId, jobStorageDirectory);
+}
+
 async function resolveDocumentAgent(
-  options: GenerateDocumentOptions,
+  options: Pick<GenerateDocumentOptions, 'model' | 'thinkingLevel'>,
   projectDirectory: string,
 ): Promise<DocumentAgent> {
   return createConfiguredDocumentAgent(
@@ -55,12 +99,16 @@ async function resolveDocumentAgent(
 }
 
 function createFileSystemDocumentGeneration(documentAgent: DocumentAgent) {
-  return createDocumentGeneration({
+  return createDocumentGeneration(createFileSystemDependencies(documentAgent));
+}
+
+function createFileSystemDependencies(documentAgent: DocumentAgent) {
+  return {
     directoryValidator: fileSystemDirectoryValidator,
     jobStore: fileSystemJobStore,
     materialCollector: fileSystemMaterialCollector,
     materialExtractor: anydocMaterialExtractor,
     documentAgent,
     outputPublisher: fileSystemOutputPublisher,
-  });
+  };
 }

@@ -40,4 +40,47 @@ describe('fileSystemOutputPublisher', () => {
     ).rejects.toThrow('没有在');
     expect(await readFile(join(targetDirectory, 'previous.md'), 'utf8')).toBe('# 保留\n');
   });
+
+  it('publishes extraction assets referenced by the draft', async () => {
+    const rootDirectory = await mkdtemp(join(tmpdir(), 'inkagent-output-'));
+    const sourceDirectory = join(rootDirectory, 'draft');
+    const assetSourceDirectory = join(rootDirectory, 'extract');
+    const targetDirectory = join(rootDirectory, 'published');
+    await mkdir(sourceDirectory);
+    await mkdir(join(assetSourceDirectory, 'docx', 'a.docx.assets'), { recursive: true });
+    await writeFile(
+      join(sourceDirectory, 'document.md'),
+      '# 终稿\n\n![图](extract/docx/a.docx.assets/image-1.png)\n',
+    );
+    await writeFile(join(assetSourceDirectory, 'docx', 'a.docx.assets', 'image-1.png'), 'image');
+
+    const result = await fileSystemOutputPublisher.publish({
+      sourceDirectory,
+      targetDirectory,
+      assetSourceDirectory,
+    });
+
+    expect(result.files).toEqual(['document.md', 'extract/docx/a.docx.assets/image-1.png']);
+    expect(
+      await readFile(
+        join(targetDirectory, 'extract', 'docx', 'a.docx.assets', 'image-1.png'),
+        'utf8',
+      ),
+    ).toBe('image');
+  });
+
+  it('keeps the previous output when markdown references a missing local file', async () => {
+    const rootDirectory = await mkdtemp(join(tmpdir(), 'inkagent-output-'));
+    const sourceDirectory = join(rootDirectory, 'draft');
+    const targetDirectory = join(rootDirectory, 'published');
+    await mkdir(sourceDirectory);
+    await mkdir(targetDirectory);
+    await writeFile(join(sourceDirectory, 'document.md'), '![图](missing.png)\n');
+    await writeFile(join(targetDirectory, 'previous.md'), '# 保留\n');
+
+    await expect(
+      fileSystemOutputPublisher.publish({ sourceDirectory, targetDirectory }),
+    ).rejects.toThrow('引用了不存在的本地文件');
+    expect(await readFile(join(targetDirectory, 'previous.md'), 'utf8')).toBe('# 保留\n');
+  });
 });

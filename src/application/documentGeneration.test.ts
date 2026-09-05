@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createDocumentGeneration } from './documentGeneration.js';
+import { createDocumentGeneration, createDocumentRetry } from './documentGeneration.js';
 import type {
   DocumentJob,
   DocumentWorkspace,
@@ -97,6 +97,79 @@ describe('createDocumentGeneration', () => {
     expect(events).not.toContain('generate');
     expect(events).toContain('failed');
   });
+
+  it('keeps the original error when recording the failure also fails', async () => {
+    const originalError = new Error('模型调用失败');
+    const generation = createDocumentGeneration({
+      directoryValidator: createDirectoryValidator([]),
+      jobStore: {
+        ...createJobStore([], createWorkspace()),
+        async failJob() {
+          throw new Error('任务记录写入失败');
+        },
+      },
+      materialCollector: createMaterialCollector([]),
+      materialExtractor: createMaterialExtractor([]),
+      documentAgent: {
+        async generate() {
+          throw originalError;
+        },
+      },
+      outputPublisher: createOutputPublisher([]),
+    });
+
+    await expect(
+      generation.execute({
+        inputDirectory: '/input',
+        outputDirectory: '/output',
+        jobStorageDirectory: '/jobs',
+        brief: '写文档',
+      }),
+    ).rejects.toBe(originalError);
+  });
+
+  it('retries generation from extracted materials without collecting again', async () => {
+    const events: string[] = [];
+    const failedJob = {
+      ...createJob(createWorkspace()),
+      phase: 'failed' as const,
+      extractions: [
+        {
+          sourcePath: 'notes.md',
+          kind: 'markdown' as const,
+          status: 'ok' as const,
+          extractedPath: 'markdown/notes.md',
+        },
+      ],
+      failure: { phase: 'generating' as const, message: '模型失败' },
+    };
+    const generation = createDocumentRetry({
+      directoryValidator: createDirectoryValidator(events),
+      jobStore: {
+        ...createJobStore(events, failedJob.workspace),
+        async getJob() {
+          return failedJob;
+        },
+      },
+      materialCollector: {
+        async collect() {
+          throw new Error('不应重新收集');
+        },
+      },
+      materialExtractor: createMaterialExtractor(events),
+      documentAgent: {
+        async generate() {
+          events.push('generate');
+        },
+      },
+      outputPublisher: createOutputPublisher(events),
+    });
+
+    const result = await generation.execute({ jobId: 'job-1', jobStorageDirectory: '/jobs' });
+
+    expect(result.job.phase).toBe('succeeded');
+    expect(events).toEqual(['generating', 'generate', 'publishing', 'publish', 'succeeded']);
+  });
 });
 
 function createWorkspace(): DocumentWorkspace {
@@ -124,6 +197,9 @@ function createJobStore(events: string[], workspace: DocumentWorkspace): JobStor
       events.push('create');
       return createJob(workspace);
     },
+    async getJob() {
+      return createJob(workspace);
+    },
     async updateJobPhase({ job, phase }) {
       events.push(phase);
       return { ...job, phase };
@@ -148,6 +224,7 @@ function createJob(workspace: DocumentWorkspace): DocumentJob {
     id: 'job-1',
     phase: 'created',
     workspace,
+    outputDirectory: '/output',
     extractions: [],
   };
 }

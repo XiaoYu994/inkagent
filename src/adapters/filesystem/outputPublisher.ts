@@ -9,8 +9,12 @@ import type {
 } from '../../application/ports.js';
 import { InkAgentError } from '../../errors.js';
 import { acquireOutputLock } from './outputLock.js';
-import { assertOutputDirectoryUsable } from './treeFiles.js';
-import { copyMarkdownTree } from './treeFiles.js';
+import {
+  assertOutputDirectoryUsable,
+  copyMarkdownTree,
+  copyNonMarkdownTree,
+  validateMarkdownTree,
+} from './treeFiles.js';
 
 export const fileSystemOutputPublisher: OutputPublisher = {
   publish: publishMarkdownDraft,
@@ -33,8 +37,16 @@ async function publishLockedDraft(request: PublishDraftRequest): Promise<Publish
       sourceDirectory: request.sourceDirectory,
       targetDirectory: temporaryDirectory,
     });
+    const assetFiles =
+      request.assetSourceDirectory === undefined
+        ? []
+        : await copyNonMarkdownTree({
+            sourceDirectory: request.assetSourceDirectory,
+            targetDirectory: join(temporaryDirectory, 'extract'),
+          });
+    await validateMarkdownTree(temporaryDirectory);
     await replaceOutputDirectory(temporaryDirectory, request.targetDirectory);
-    return { files };
+    return { files: [...files, ...assetFiles.map((file) => `extract/${file}`)].sort() };
   } catch (error) {
     await removeTemporaryDirectory(temporaryDirectory);
     throw error;

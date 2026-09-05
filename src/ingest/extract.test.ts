@@ -153,6 +153,24 @@ describe('extractSourceFiles', () => {
 
     expect(records[0]?.status).toBe('unsupported');
   });
+
+  it('marks empty text files as extraction errors', async () => {
+    const { inputDirectory, extractionDirectory } = await createDirectories();
+    await writeFile(join(inputDirectory, 'empty.txt'), ' \n');
+
+    const records = await extractSourceFiles({
+      inputDirectory,
+      extractionDirectory,
+      sourceFiles: [{ relativePath: 'empty.txt' }],
+    });
+
+    expect(records[0]).toMatchObject({
+      sourcePath: 'empty.txt',
+      kind: 'plain-text',
+      status: 'error',
+      errorMessage: expect.stringContaining('文件内容为空'),
+    });
+  });
 });
 
 async function createDirectories(): Promise<{

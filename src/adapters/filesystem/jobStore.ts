@@ -1,4 +1,4 @@
-import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
@@ -15,6 +15,7 @@ import { formatError, InkAgentError } from '../../errors.js';
 
 export const fileSystemJobStore: JobStore = {
   createJob,
+  getJob,
   updateJobPhase,
   recordExtractions,
   failJob,
@@ -27,8 +28,43 @@ async function createJob(request: CreateJobRequest): Promise<DocumentJob> {
   await writeTextFile(workspace.briefFile, `${request.brief}\n`);
 
   const job = createJobRecord(jobId, workspace);
-  await writeJobFile(job);
-  return job;
+  const jobWithOutput = { ...job, outputDirectory: request.outputDirectory };
+  await writeJobFile(jobWithOutput);
+  return jobWithOutput;
+}
+
+async function getJob(jobId: string, jobStorageDirectory: string): Promise<DocumentJob> {
+  assertSafeJobId(jobId);
+  const jobFile = join(jobStorageDirectory, jobId, 'job.json');
+  try {
+    const job = JSON.parse(await readFile(jobFile, 'utf8')) as Partial<DocumentJob>;
+    return validateStoredJob(job, jobId);
+  } catch (error) {
+    if (error instanceof InkAgentError) {
+      throw error;
+    }
+    throw new InkAgentError(`读取任务失败: ${jobId}`, { cause: error });
+  }
+}
+
+function assertSafeJobId(jobId: string): void {
+  if (jobId.length === 0 || jobId === '.' || jobId === '..' || /[\\/]/.test(jobId)) {
+    throw new InkAgentError(`任务 ID 无效: ${jobId}`);
+  }
+}
+
+function validateStoredJob(job: Partial<DocumentJob>, jobId: string): DocumentJob {
+  if (
+    typeof job.id !== 'string' ||
+    job.id !== jobId ||
+    typeof job.outputDirectory !== 'string' ||
+    job.workspace === undefined ||
+    !Array.isArray(job.extractions) ||
+    job.phase === undefined
+  ) {
+    throw new InkAgentError(`任务记录格式无效: ${jobId}`);
+  }
+  return job as DocumentJob;
 }
 
 async function updateJobPhase(request: UpdateJobPhaseRequest): Promise<DocumentJob> {
@@ -60,7 +96,10 @@ async function failJob(request: FailJobRequest): Promise<DocumentJob> {
   return job;
 }
 
-function createJobRecord(jobId: string, workspace: DocumentWorkspace): DocumentJob {
+function createJobRecord(
+  jobId: string,
+  workspace: DocumentWorkspace,
+): Omit<DocumentJob, 'outputDirectory'> {
   return {
     id: jobId,
     phase: 'created',

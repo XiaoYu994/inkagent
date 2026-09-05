@@ -14,6 +14,7 @@ export type DocumentJob = {
   id: string;
   phase: JobPhase;
   workspace: DocumentWorkspace;
+  outputDirectory: string;
   extractions: readonly MaterialExtraction[];
   failure?: JobFailure;
 };
@@ -21,6 +22,7 @@ export type DocumentJob = {
 export type CreateJobRequest = {
   jobStorageDirectory: string;
   brief: string;
+  outputDirectory: string;
 };
 
 export type GenerationDirectories = {
@@ -50,6 +52,7 @@ export type FailJobRequest = {
 
 export type JobStore = {
   createJob(request: CreateJobRequest): Promise<DocumentJob>;
+  getJob(jobId: string, jobStorageDirectory: string): Promise<DocumentJob>;
   updateJobPhase(request: UpdateJobPhaseRequest): Promise<DocumentJob>;
   recordExtractions(request: RecordExtractionsRequest): Promise<DocumentJob>;
   failJob(request: FailJobRequest): Promise<DocumentJob>;
@@ -80,6 +83,7 @@ export type DocumentAgent = {
 export type PublishDraftRequest = {
   sourceDirectory: string;
   targetDirectory: string;
+  assetSourceDirectory?: string;
 };
 
 export type PublishedDraft = {

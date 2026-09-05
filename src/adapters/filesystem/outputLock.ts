@@ -1,4 +1,4 @@
-import { mkdir, open, rm, type FileHandle } from 'node:fs/promises';
+import { mkdir, open, readFile, rm, type FileHandle } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 
 import { InkAgentError } from '../../errors.js';
@@ -21,7 +21,8 @@ export async function acquireOutputLock(targetDirectory: string): Promise<Output
       await removeFailedLock(lockFile, fileHandle);
     }
     if (hasErrorCode(error, 'EEXIST')) {
-      throw new InkAgentError(`输出目录正在被另一个任务使用: ${targetDirectory}`);
+      await recoverStaleLock(lockFile);
+      return acquireOutputLock(targetDirectory);
     }
     throw new InkAgentError(`无法锁定输出目录: ${targetDirectory}`, { cause: error });
   }
@@ -38,6 +39,42 @@ export async function acquireOutputLock(targetDirectory: string): Promise<Output
       return releasePromise;
     },
   };
+}
+
+async function recoverStaleLock(lockFile: string): Promise<void> {
+  const ownerProcessId = await readLockProcessId(lockFile);
+  if (ownerProcessId !== undefined && isProcessRunning(ownerProcessId)) {
+    throw new InkAgentError(`输出目录正在被另一个任务使用（PID ${ownerProcessId}）`);
+  }
+  try {
+    await rm(lockFile);
+  } catch (error) {
+    if (!hasErrorCode(error, 'ENOENT')) {
+      throw new InkAgentError(`无法恢复遗留输出锁: ${lockFile}`, { cause: error });
+    }
+  }
+}
+
+async function readLockProcessId(lockFile: string): Promise<number | undefined> {
+  try {
+    const content = await readFile(lockFile, 'utf8');
+    const processId = Number.parseInt(content.trim(), 10);
+    return Number.isSafeInteger(processId) && processId > 0 ? processId : undefined;
+  } catch (error) {
+    if (hasErrorCode(error, 'ENOENT')) {
+      return undefined;
+    }
+    throw new InkAgentError(`无法读取输出锁: ${lockFile}`, { cause: error });
+  }
+}
+
+function isProcessRunning(processId: number): boolean {
+  try {
+    process.kill(processId, 0);
+    return true;
+  } catch (error) {
+    return !hasErrorCode(error, 'ESRCH');
+  }
 }
 
 async function removeFailedLock(lockFile: string, fileHandle: FileHandle): Promise<void> {

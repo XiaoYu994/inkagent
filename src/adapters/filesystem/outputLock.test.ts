@@ -1,4 +1,4 @@
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -38,5 +38,15 @@ describe('acquireOutputLock', () => {
 
     await expect(acquireOutputLock(outputDirectory)).rejects.toThrow('正在被另一个任务使用');
     await nextLock.release();
+  });
+
+  it('recovers a lock left by a process that no longer exists', async () => {
+    const rootDirectory = await mkdtemp(join(tmpdir(), 'inkagent-lock-'));
+    const outputDirectory = join(rootDirectory, 'output');
+    await writeFile(join(rootDirectory, '.output.inkagent.lock'), '999999999\n');
+
+    const lock = await acquireOutputLock(outputDirectory);
+
+    await lock.release();
   });
 });

@@ -95,11 +95,18 @@ function parseModelReference(value: unknown, filePath: string): string {
     value,
     `项目配置字段 "model" 必须是非空字符串: ${filePath}`,
   );
-  const separator = reference.indexOf('/');
-  if (separator <= 0 || separator === reference.length - 1) {
+  if (!isModelReference(reference)) {
     throw new InkAgentError(`项目配置字段 "model" 必须是 provider/modelId: ${filePath}`);
   }
   return reference;
+}
+
+export function isModelReference(value: unknown): value is string {
+  if (typeof value !== 'string' || value !== value.trim()) {
+    return false;
+  }
+  const separator = value.indexOf('/');
+  return separator > 0 && separator < value.length - 1;
 }
 
 function parseThinkingLevel(value: unknown, filePath: string): ThinkingLevel {

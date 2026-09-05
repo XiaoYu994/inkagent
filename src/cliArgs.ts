@@ -1,6 +1,7 @@
 import { parseArgs } from 'node:util';
 
 import { InkAgentError, formatError } from './errors.js';
+import { isModelReference } from './config/projectConfig.js';
 import { thinkingLevels, type ThinkingLevel } from './domain/thinkingLevel.js';
 import type { GenerateDocumentOptions } from './generate.js';
 
@@ -87,6 +88,10 @@ function parseRetryCommand(args: string[]): ParsedCliArgs {
     throw new InkAgentError(invalidWithUsage('retry 必须提供一个 job-id'));
   }
   const thinkingLevel = values['thinking-level'];
+  const model = values.model;
+  if (model !== undefined && !isModelReference(model)) {
+    throw new InkAgentError(invalidWithUsage('--model 必须是 provider/modelId'));
+  }
   if (thinkingLevel !== undefined && !thinkingLevels.some((level) => level === thinkingLevel)) {
     throw new InkAgentError(
       invalidWithUsage(`--thinking-level 只支持: ${thinkingLevels.join(' / ')}`),
@@ -98,7 +103,7 @@ function parseRetryCommand(args: string[]): ParsedCliArgs {
     ...(values['job-directory'] === undefined
       ? {}
       : { jobStorageDirectory: values['job-directory'] as string }),
-    ...(values.model === undefined ? {} : { model: values.model as string }),
+    ...(model === undefined ? {} : { model: model as string }),
     ...(thinkingLevel === undefined ? {} : { thinkingLevel: thinkingLevel as ThinkingLevel }),
   };
 }
@@ -132,6 +137,9 @@ function parseGenerateCommand(args: string[]): ParsedCliArgs {
 
   const jobStorageDirectory = values['job-directory'];
   const model = values.model;
+  if (model !== undefined && !isModelReference(model)) {
+    throw new InkAgentError(invalidWithUsage('--model 必须是 provider/modelId'));
+  }
   const thinkingLevel = values['thinking-level'];
   if (thinkingLevel !== undefined && !thinkingLevels.some((level) => level === thinkingLevel)) {
     throw new InkAgentError(

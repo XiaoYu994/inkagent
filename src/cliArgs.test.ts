@@ -142,6 +142,24 @@ describe('parseCliArgs', () => {
     ).toThrow(InkAgentError);
   });
 
+  it('rejects an invalid model reference', () => {
+    expect(() =>
+      parseCliArgs([
+        'generate',
+        '--input-directory',
+        'a',
+        '--output-directory',
+        'b',
+        '--model',
+        'glm-5.3-flash',
+        '写文档',
+      ]),
+    ).toThrow(/provider\/modelId/);
+    expect(() => parseCliArgs(['retry', '--model', ' provider/model ', 'job-1'])).toThrow(
+      /provider\/modelId/,
+    );
+  });
+
   it('wraps unknown flags into InkAgentError with usage', () => {
     expect(() => parseCliArgs(['generate', '--nope'])).toThrow(InkAgentError);
     try {

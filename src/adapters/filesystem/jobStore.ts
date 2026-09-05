@@ -12,6 +12,7 @@ import type {
   UpdateJobPhaseRequest,
 } from '../../application/ports.js';
 import { formatError, InkAgentError } from '../../errors.js';
+import { isPathInside } from '../../shared/pathRelationship.js';
 
 export const fileSystemJobStore: JobStore = {
   createJob,
@@ -116,7 +117,7 @@ function validateStoredJob(
   if (
     typeof job.id !== 'string' ||
     job.id !== jobId ||
-    typeof job.outputDirectory !== 'string' ||
+    !isIndependentOutputDirectory(job.outputDirectory, jobStorageDirectory, jobId) ||
     !isExpectedWorkspace(job.workspace, jobStorageDirectory, jobId) ||
     !Array.isArray(job.extractions) ||
     job.phase === undefined
@@ -124,6 +125,23 @@ function validateStoredJob(
     throw new InkAgentError(`任务记录格式无效: ${jobId}`);
   }
   return job as DocumentJob;
+}
+
+function isIndependentOutputDirectory(
+  outputDirectory: unknown,
+  jobStorageDirectory: string,
+  jobId: string,
+): outputDirectory is string {
+  if (typeof outputDirectory !== 'string') {
+    return false;
+  }
+  if (
+    isPathInside(outputDirectory, jobStorageDirectory) ||
+    isPathInside(jobStorageDirectory, outputDirectory)
+  ) {
+    throw new InkAgentError(`任务输出目录无效: ${jobId}`);
+  }
+  return true;
 }
 
 function isExpectedWorkspace(

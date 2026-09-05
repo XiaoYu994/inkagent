@@ -80,6 +80,26 @@ describe('fileSystemJobStore', () => {
     );
   });
 
+  it('rejects a job whose output directory overlaps job storage', async () => {
+    const rootDirectory = await mkdtemp(join(tmpdir(), 'inkagent-job-'));
+    const jobStorageDirectory = join(rootDirectory, 'jobs');
+    const job = await fileSystemJobStore.createJob({
+      jobStorageDirectory,
+      brief: '生成文档',
+      outputDirectory: join(rootDirectory, 'output'),
+    });
+    const jobFile = join(job.workspace.rootDirectory, 'job.json');
+    const storedJob = JSON.parse(await readFile(jobFile, 'utf8'));
+    await writeFile(
+      jobFile,
+      JSON.stringify({ ...storedJob, outputDirectory: jobStorageDirectory }),
+    );
+
+    await expect(fileSystemJobStore.getJob(job.id, jobStorageDirectory)).rejects.toThrow(
+      '任务输出目录无效',
+    );
+  });
+
   it('rejects a job id that escapes the storage directory', async () => {
     await expect(fileSystemJobStore.getJob('../outside', '/tmp/jobs')).rejects.toThrow(
       '任务 ID 无效',

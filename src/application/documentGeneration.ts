@@ -1,6 +1,7 @@
 import type { JobPhase } from '../domain/job.js';
 import type { MaterialExtraction } from '../domain/material.js';
 import { InkAgentError } from '../errors.js';
+import { assertValidInputResourceLimits } from './inputResourceLimits.js';
 import type {
   DocumentAgent,
   DocumentJob,
@@ -66,6 +67,9 @@ class DocumentGenerationRun {
 
   private async run(): Promise<GenerateDocumentResult> {
     const brief = requireBrief(this.request.brief);
+    if (this.request.inputLimits !== undefined) {
+      assertValidInputResourceLimits(this.request.inputLimits);
+    }
     await this.dependencies.directoryValidator.validate(this.request);
     this.currentJob = await this.dependencies.jobStore.createJob({
       jobStorageDirectory: this.request.jobStorageDirectory,

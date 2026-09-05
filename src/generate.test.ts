@@ -81,4 +81,41 @@ describe('document generation', () => {
       }),
     ).rejects.toThrow('没有可用来生成文档的材料');
   });
+
+  it('rejects invalid input limits before creating a job', async () => {
+    const rootDirectory = await mkdtemp(join(tmpdir(), 'inkagent-generation-'));
+    const inputDirectory = join(rootDirectory, 'input');
+    const outputDirectory = join(rootDirectory, 'output');
+    const jobStorageDirectory = join(rootDirectory, 'jobs');
+    await mkdir(inputDirectory);
+    await writeFile(join(inputDirectory, 'notes.md'), '# 材料\n');
+
+    const generation = createDocumentGeneration({
+      directoryValidator: fileSystemDirectoryValidator,
+      jobStore: fileSystemJobStore,
+      materialCollector: fileSystemMaterialCollector,
+      materialExtractor: anydocMaterialExtractor,
+      documentAgent: {
+        async generate() {
+          throw new Error('不应调用 Agent');
+        },
+      },
+      outputPublisher: fileSystemOutputPublisher,
+    });
+
+    await expect(
+      generation.execute({
+        inputDirectory,
+        outputDirectory,
+        jobStorageDirectory,
+        brief: '生成文档',
+        inputLimits: {
+          maxFiles: 0,
+          maxFileBytes: 1024,
+          maxTotalBytes: 1024,
+        },
+      }),
+    ).rejects.toThrow('输入资源限制 maxFiles 必须是正整数');
+    await expect(fileSystemJobStore.listJobs(jobStorageDirectory)).resolves.toEqual([]);
+  });
 });

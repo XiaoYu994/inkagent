@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { createConfiguredDocumentAgent } from './adapters/pi/configuredDocumentAgent.js';
 import type { DocumentAgent } from './application/ports.js';
 import { defaultInputResourceLimits } from './application/ports.js';
+import { assertValidInputResourceLimits } from './application/inputResourceLimits.js';
 import {
   createDocumentGeneration,
   createDocumentRetry,
@@ -42,10 +43,13 @@ export async function generateDocument(
   options: GenerateDocumentOptions,
 ): Promise<GenerateDocumentResult> {
   const projectDirectory = options.projectDirectory ?? process.cwd();
+  const inputLimits = createInputResourceLimits(options);
+  if (inputLimits !== undefined) {
+    assertValidInputResourceLimits(inputLimits);
+  }
   const documentAgent = await resolveDocumentAgent(options, projectDirectory);
   const jobStorageDirectory =
     options.jobStorageDirectory ?? join(projectDirectory, '.inkagent', 'jobs');
-  const inputLimits = createInputResourceLimits(options);
 
   return createFileSystemDocumentGeneration(documentAgent).execute({
     inputDirectory: options.inputDirectory,

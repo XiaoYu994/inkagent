@@ -3,6 +3,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 
 import { InkAgentError, isEnoentError } from '../../errors.js';
 import { defaultInputResourceLimits, type InputResourceLimits } from '../../application/ports.js';
+import { assertValidInputResourceLimits } from '../../application/inputResourceLimits.js';
 import { isPathInside } from '../../shared/pathRelationship.js';
 
 type TreeFile = {
@@ -140,9 +141,7 @@ async function assertRegularFile(sourcePath: string, realPath: string): Promise<
 }
 
 function assertInputResourceLimits(files: readonly TreeFile[], limits: InputResourceLimits): void {
-  assertPositiveIntegerLimit(limits.maxFiles, 'maxFiles');
-  assertPositiveIntegerLimit(limits.maxFileBytes, 'maxFileBytes');
-  assertPositiveIntegerLimit(limits.maxTotalBytes, 'maxTotalBytes');
+  assertValidInputResourceLimits(limits);
   if (files.length > limits.maxFiles) {
     throw new InkAgentError(`输入文件数量超过限制: ${files.length} > ${limits.maxFiles}`);
   }
@@ -157,12 +156,6 @@ function assertInputResourceLimits(files: readonly TreeFile[], limits: InputReso
     throw new InkAgentError(
       `输入文件总大小超过限制: ${totalBytes} > ${limits.maxTotalBytes} bytes`,
     );
-  }
-}
-
-function assertPositiveIntegerLimit(value: number, name: string): void {
-  if (!Number.isSafeInteger(value) || value <= 0) {
-    throw new InkAgentError(`输入资源限制 ${name} 必须是正整数`);
   }
 }
 

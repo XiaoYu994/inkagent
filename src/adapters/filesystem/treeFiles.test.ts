@@ -50,6 +50,37 @@ describe('copyInputTree', () => {
 
     await expect(copyInputTree({ sourceDirectory, targetDirectory })).rejects.toThrow(/非文件路径/);
   });
+
+  it('rejects input that exceeds file count or byte limits', async () => {
+    const sourceDirectory = await mkdtemp(join(tmpdir(), 'inkagent-input-'));
+    const targetDirectory = join(sourceDirectory, 'target');
+    await writeFile(join(sourceDirectory, 'one.md'), '1234');
+    await writeFile(join(sourceDirectory, 'two.md'), '5678');
+
+    await expect(
+      copyInputTree({
+        sourceDirectory,
+        targetDirectory,
+        limits: { maxFiles: 1, maxFileBytes: 100, maxTotalBytes: 100 },
+      }),
+    ).rejects.toThrow('输入文件数量超过限制');
+
+    await expect(
+      copyInputTree({
+        sourceDirectory,
+        targetDirectory,
+        limits: { maxFiles: 10, maxFileBytes: 3, maxTotalBytes: 100 },
+      }),
+    ).rejects.toThrow('输入文件超过单文件大小限制');
+
+    await expect(
+      copyInputTree({
+        sourceDirectory,
+        targetDirectory,
+        limits: { maxFiles: 10, maxFileBytes: 100, maxTotalBytes: 7 },
+      }),
+    ).rejects.toThrow('输入文件总大小超过限制');
+  });
 });
 
 describe('copyMarkdownTree', () => {

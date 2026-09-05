@@ -148,6 +148,25 @@ function parseGenerateCommand(args: string[]): ParsedCliArgs {
       ...(jobStorageDirectory === undefined ? {} : { jobStorageDirectory }),
       ...(model === undefined ? {} : { model }),
       ...(thinkingLevel === undefined ? {} : { thinkingLevel: thinkingLevel as ThinkingLevel }),
+      ...(values['max-input-files'] === undefined
+        ? {}
+        : { maxInputFiles: parsePositiveInteger(values['max-input-files'], '--max-input-files') }),
+      ...(values['max-input-file-bytes'] === undefined
+        ? {}
+        : {
+            maxInputFileBytes: parsePositiveInteger(
+              values['max-input-file-bytes'],
+              '--max-input-file-bytes',
+            ),
+          }),
+      ...(values['max-input-total-bytes'] === undefined
+        ? {}
+        : {
+            maxInputTotalBytes: parsePositiveInteger(
+              values['max-input-total-bytes'],
+              '--max-input-total-bytes',
+            ),
+          }),
     },
   };
 }
@@ -160,6 +179,9 @@ function parseGenerateFlags(args: string[]): {
     'job-directory'?: string;
     model?: string;
     'thinking-level'?: string;
+    'max-input-files'?: string;
+    'max-input-file-bytes'?: string;
+    'max-input-total-bytes'?: string;
   };
   positionals: string[];
 } {
@@ -174,6 +196,9 @@ function parseGenerateFlags(args: string[]): {
         'job-directory': { type: 'string' },
         model: { type: 'string' },
         'thinking-level': { type: 'string' },
+        'max-input-files': { type: 'string' },
+        'max-input-file-bytes': { type: 'string' },
+        'max-input-total-bytes': { type: 'string' },
       },
     }) as {
       values: {
@@ -183,12 +208,23 @@ function parseGenerateFlags(args: string[]): {
         'job-directory'?: string;
         model?: string;
         'thinking-level'?: string;
+        'max-input-files'?: string;
+        'max-input-file-bytes'?: string;
+        'max-input-total-bytes'?: string;
       };
       positionals: string[];
     };
   } catch (error) {
     throw new InkAgentError(invalidWithUsage(formatError(error)), { cause: error });
   }
+}
+
+function parsePositiveInteger(value: string, flagName: string): number {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new InkAgentError(invalidWithUsage(`${flagName} 必须是正整数`));
+  }
+  return parsed;
 }
 
 function parseJobFlags(args: string[]) {
@@ -229,7 +265,7 @@ function invalidWithUsage(reason: string): string {
 function usageText(): string {
   return [
     '用法:',
-    '  inkagent generate --input-directory <目录> --output-directory <目录> [--model <引用>] <brief>',
+    '  inkagent generate --input-directory <目录> --output-directory <目录> [选项] <brief>',
     '  inkagent models',
     '  inkagent jobs [--job-directory <目录>]',
     '  inkagent status [--job-directory <目录>] <job-id>',
@@ -241,6 +277,9 @@ function usageText(): string {
     '  --job-directory <目录>     任务过程文件目录，默认 ./.inkagent/jobs',
     '  --model <引用>     指定模型（provider/modelId）。未传时读 inkagent.json，不再使用 Pi 全局默认',
     '  --thinking-level <档> off/minimal/low/medium/high/xhigh/max',
+    '  --max-input-files <数量>  输入文件数量上限，默认 1000',
+    '  --max-input-file-bytes <字节>  单个输入文件大小上限，默认 52428800',
+    '  --max-input-total-bytes <字节> 输入文件总大小上限，默认 209715200',
     '  -h, --help        显示本帮助',
     '',
   ].join('\n');

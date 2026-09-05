@@ -11,6 +11,7 @@ async function collectMaterials(request: CollectMaterialsRequest): Promise<reado
   const relativePaths = await copyInputTree({
     sourceDirectory: request.inputDirectory,
     targetDirectory: request.workspace.inputDirectory,
+    ...(request.inputLimits === undefined ? {} : { limits: request.inputLimits }),
   });
   if (relativePaths.length === 0) {
     throw new InkAgentError(`输入目录中没有可用材料: ${request.inputDirectory}`);

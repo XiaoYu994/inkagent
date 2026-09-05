@@ -62,6 +62,19 @@ export type JobStore = {
 export type CollectMaterialsRequest = {
   inputDirectory: string;
   workspace: DocumentWorkspace;
+  inputLimits?: InputResourceLimits;
+};
+
+export type InputResourceLimits = {
+  maxFiles: number;
+  maxFileBytes: number;
+  maxTotalBytes: number;
+};
+
+export const defaultInputResourceLimits: InputResourceLimits = {
+  maxFiles: 1000,
+  maxFileBytes: 50 * 1024 * 1024,
+  maxTotalBytes: 200 * 1024 * 1024,
 };
 
 export type MaterialCollector = {

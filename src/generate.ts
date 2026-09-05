@@ -2,6 +2,7 @@ import { join } from 'node:path';
 
 import { createConfiguredDocumentAgent } from './adapters/pi/configuredDocumentAgent.js';
 import type { DocumentAgent } from './application/ports.js';
+import { defaultInputResourceLimits } from './application/ports.js';
 import {
   createDocumentGeneration,
   createDocumentRetry,
@@ -22,6 +23,9 @@ export type GenerateDocumentOptions = {
   projectDirectory?: string;
   model?: string;
   thinkingLevel?: ThinkingLevel;
+  maxInputFiles?: number;
+  maxInputFileBytes?: number;
+  maxInputTotalBytes?: number;
 };
 
 export type GenerateDocumentResult = ApplicationGenerateDocumentResult;
@@ -41,13 +45,35 @@ export async function generateDocument(
   const documentAgent = await resolveDocumentAgent(options, projectDirectory);
   const jobStorageDirectory =
     options.jobStorageDirectory ?? join(projectDirectory, '.inkagent', 'jobs');
+  const inputLimits = createInputResourceLimits(options);
 
   return createFileSystemDocumentGeneration(documentAgent).execute({
     inputDirectory: options.inputDirectory,
     outputDirectory: options.outputDirectory,
     jobStorageDirectory,
     brief: options.brief,
+    ...(inputLimits === undefined ? {} : { inputLimits }),
   });
+}
+
+function createInputResourceLimits(
+  options: Pick<
+    GenerateDocumentOptions,
+    'maxInputFiles' | 'maxInputFileBytes' | 'maxInputTotalBytes'
+  >,
+) {
+  if (
+    options.maxInputFiles === undefined &&
+    options.maxInputFileBytes === undefined &&
+    options.maxInputTotalBytes === undefined
+  ) {
+    return undefined;
+  }
+  return {
+    maxFiles: options.maxInputFiles ?? defaultInputResourceLimits.maxFiles,
+    maxFileBytes: options.maxInputFileBytes ?? defaultInputResourceLimits.maxFileBytes,
+    maxTotalBytes: options.maxInputTotalBytes ?? defaultInputResourceLimits.maxTotalBytes,
+  };
 }
 
 export async function retryDocument(

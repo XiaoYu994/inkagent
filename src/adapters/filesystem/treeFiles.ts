@@ -2,25 +2,28 @@ import { cp, lstat, mkdir, readFile, readdir, realpath, rm, stat } from 'node:fs
 import { dirname, join, relative, resolve, sep } from 'node:path';
 
 import { InkAgentError, isEnoentError } from '../../errors.js';
+import { defaultInputResourceLimits, type InputResourceLimits } from '../../application/ports.js';
 
 type TreeFile = {
   sourcePath: string;
   realPath: string;
   relativePath: string;
+  sizeBytes: number;
 };
 
 export type CopyTreeRequest = {
   sourceDirectory: string;
   targetDirectory: string;
+  limits?: InputResourceLimits;
 };
 
 export async function copyInputTree(request: CopyTreeRequest): Promise<string[]> {
-  const files = await listTreeFiles(request.sourceDirectory);
+  const files = (await listTreeFiles(request.sourceDirectory)).filter(
+    (file) => !hasHiddenPathSegment(file.relativePath),
+  );
+  assertInputResourceLimits(files, request.limits ?? defaultInputResourceLimits);
   const copiedFiles: string[] = [];
   for (const file of files) {
-    if (hasHiddenPathSegment(file.relativePath)) {
-      continue;
-    }
     await copyTreeFile(file, request.targetDirectory);
     copiedFiles.push(file.relativePath);
   }
@@ -93,11 +96,12 @@ async function listTreeFiles(sourceDirectory: string): Promise<TreeFile[]> {
       'parentPath' in entry && typeof entry.parentPath === 'string' ? entry.parentPath : sourceRoot;
     const sourcePath = resolve(parentDirectory, entry.name);
     const realPath = await resolveRealPath(sourcePath, `无法读取输入项 ${sourcePath}`);
-    await assertRegularFile(sourcePath, realPath);
+    const sizeBytes = await assertRegularFile(sourcePath, realPath);
     files.push({
       sourcePath,
       realPath,
       relativePath: relative(sourceRoot, sourcePath).split(sep).join('/'),
+      sizeBytes,
     });
   }
   return files;
@@ -121,7 +125,7 @@ async function copyTreeFile(file: TreeFile, targetDirectory: string): Promise<vo
   }
 }
 
-async function assertRegularFile(sourcePath: string, realPath: string): Promise<void> {
+async function assertRegularFile(sourcePath: string, realPath: string): Promise<number> {
   let fileStats;
   try {
     fileStats = await stat(realPath);
@@ -130,6 +134,34 @@ async function assertRegularFile(sourcePath: string, realPath: string): Promise<
   }
   if (!fileStats.isFile()) {
     throw new InkAgentError(`不支持复制非文件路径: ${sourcePath}`);
+  }
+  return fileStats.size;
+}
+
+function assertInputResourceLimits(files: readonly TreeFile[], limits: InputResourceLimits): void {
+  assertPositiveIntegerLimit(limits.maxFiles, 'maxFiles');
+  assertPositiveIntegerLimit(limits.maxFileBytes, 'maxFileBytes');
+  assertPositiveIntegerLimit(limits.maxTotalBytes, 'maxTotalBytes');
+  if (files.length > limits.maxFiles) {
+    throw new InkAgentError(`输入文件数量超过限制: ${files.length} > ${limits.maxFiles}`);
+  }
+  const oversizedFile = files.find((file) => file.sizeBytes > limits.maxFileBytes);
+  if (oversizedFile !== undefined) {
+    throw new InkAgentError(
+      `输入文件超过单文件大小限制: ${oversizedFile.relativePath} (${oversizedFile.sizeBytes} > ${limits.maxFileBytes} bytes)`,
+    );
+  }
+  const totalBytes = files.reduce((sum, file) => sum + file.sizeBytes, 0);
+  if (totalBytes > limits.maxTotalBytes) {
+    throw new InkAgentError(
+      `输入文件总大小超过限制: ${totalBytes} > ${limits.maxTotalBytes} bytes`,
+    );
+  }
+}
+
+function assertPositiveIntegerLimit(value: number, name: string): void {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new InkAgentError(`输入资源限制 ${name} 必须是正整数`);
   }
 }
 

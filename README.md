@@ -27,6 +27,8 @@ npm run build
 node dist/cli.js generate --input-directory ./uploads --output-directory ./output --model zai-coding-cn/glm-5.3-flash "根据这些材料写一份技术方案"
 ```
 
+输入资源默认限制为 1000 个文件、单文件 50 MiB、总大小 200 MiB。可按任务需要用 `--max-input-files`、`--max-input-file-bytes` 和 `--max-input-total-bytes` 覆盖；三个参数都必须是正整数。隐藏路径不会计入限制，也不会被复制。
+
 输入目录支持 Markdown、纯文本、HTML、常见图片，以及 anydoc 能转成 Markdown 的办公格式（PDF、Word、PPT、Excel、OpenDocument、RTF、EPUB、CSV 等）。Word 等办公文档会抽出嵌入的位图到任务目录的 `extract/` 旁的 `.assets/`；发布时这些资产会一并输出到 `extract/`，使终稿中的图片链接可用。Visio 抽不成图只留说明，轴标签碎行丢掉；封面/目次在第一个一级标题前裁掉。抽取决策见 [ingest.md](.agents/spec/ingest.md)。任务过程文件写在 `.inkagent/jobs/`（可用 `--job-directory` 覆盖）。输入、任务和输出目录不能互相包含。扫描件 PDF 需要 OCR，第一版不覆盖。输出会先写入临时目录，校验 Markdown 非空且本地引用完整后替换目标目录。
 
 任务支持失败后恢复：

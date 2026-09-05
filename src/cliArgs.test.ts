@@ -59,6 +59,47 @@ describe('parseCliArgs', () => {
     });
   });
 
+  it('reads input resource limits', () => {
+    const parsed = parseCliArgs([
+      'generate',
+      '--input-directory',
+      './uploads',
+      '--output-directory',
+      './output',
+      '--max-input-files',
+      '20',
+      '--max-input-file-bytes',
+      '1000',
+      '--max-input-total-bytes',
+      '5000',
+      '写文档',
+    ]);
+
+    expect(parsed).toMatchObject({
+      kind: 'generate',
+      options: {
+        maxInputFiles: 20,
+        maxInputFileBytes: 1000,
+        maxInputTotalBytes: 5000,
+      },
+    });
+  });
+
+  it('rejects invalid input resource limits', () => {
+    expect(() =>
+      parseCliArgs([
+        'generate',
+        '--input-directory',
+        'a',
+        '--output-directory',
+        'b',
+        '--max-input-files',
+        '0',
+        '写文档',
+      ]),
+    ).toThrow(/必须是正整数/);
+  });
+
   it('parses the models command', () => {
     expect(parseCliArgs(['models'])).toEqual({ kind: 'models' });
   });

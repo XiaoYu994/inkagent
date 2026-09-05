@@ -9,6 +9,7 @@ import type {
   MaterialCollector,
   MaterialExtractor,
   OutputPublisher,
+  InputResourceLimits,
 } from './ports.js';
 
 export type GenerateDocumentRequest = {
@@ -16,6 +17,7 @@ export type GenerateDocumentRequest = {
   outputDirectory: string;
   jobStorageDirectory: string;
   brief: string;
+  inputLimits?: InputResourceLimits;
 };
 
 export type GenerateDocumentResult = {
@@ -81,6 +83,7 @@ class DocumentGenerationRun {
     const sourceFiles = await this.dependencies.materialCollector.collect({
       inputDirectory: this.request.inputDirectory,
       workspace: this.getCurrentJob().workspace,
+      ...(this.request.inputLimits === undefined ? {} : { inputLimits: this.request.inputLimits }),
     });
     await this.advanceTo('extracting');
     const extractions = await this.dependencies.materialExtractor.extract({

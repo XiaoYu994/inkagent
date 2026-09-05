@@ -12,6 +12,7 @@ import type {
   UpdateJobPhaseRequest,
 } from '../../application/ports.js';
 import { jobPhases, type JobFailure, type JobPhase } from '../../domain/job.js';
+import { sourceKinds, type SourceKind } from '../../domain/material.js';
 import { formatError, InkAgentError } from '../../errors.js';
 import { isPathInside } from '../../shared/pathRelationship.js';
 
@@ -126,7 +127,40 @@ function validateStoredJob(
   ) {
     throw new InkAgentError(`任务记录格式无效: ${jobId}`);
   }
+  assertValidExtractions(job.extractions, jobId);
   return job as DocumentJob;
+}
+
+function assertValidExtractions(extractions: readonly unknown[], jobId: string): void {
+  extractions.forEach((extraction, index) => {
+    if (!isRecord(extraction) || !isSourceKind(extraction.kind)) {
+      throw new InkAgentError(`任务抽取记录无效: ${jobId} [${index}]`);
+    }
+    if (typeof extraction.sourcePath !== 'string' || extraction.sourcePath.length === 0) {
+      throw new InkAgentError(`任务抽取记录无效: ${jobId} [${index}]`);
+    }
+    if (extraction.status === 'ok') {
+      if (typeof extraction.extractedPath !== 'string' || extraction.extractedPath.length === 0) {
+        throw new InkAgentError(`任务抽取记录无效: ${jobId} [${index}]`);
+      }
+      return;
+    }
+    if (
+      (extraction.status !== 'unsupported' && extraction.status !== 'error') ||
+      typeof extraction.errorMessage !== 'string' ||
+      extraction.errorMessage.length === 0
+    ) {
+      throw new InkAgentError(`任务抽取记录无效: ${jobId} [${index}]`);
+    }
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isSourceKind(value: unknown): value is SourceKind {
+  return typeof value === 'string' && sourceKinds.includes(value as SourceKind);
 }
 
 function isValidJobState(phase: unknown, failure: unknown, jobId: string): phase is JobPhase {

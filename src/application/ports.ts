@@ -53,6 +53,7 @@ export type FailJobRequest = {
 export type JobStore = {
   createJob(request: CreateJobRequest): Promise<DocumentJob>;
   getJob(jobId: string, jobStorageDirectory: string): Promise<DocumentJob>;
+  listJobs(jobStorageDirectory: string): Promise<readonly DocumentJob[]>;
   updateJobPhase(request: UpdateJobPhaseRequest): Promise<DocumentJob>;
   recordExtractions(request: RecordExtractionsRequest): Promise<DocumentJob>;
   failJob(request: FailJobRequest): Promise<DocumentJob>;

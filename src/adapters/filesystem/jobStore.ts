@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
@@ -16,6 +16,7 @@ import { formatError, InkAgentError } from '../../errors.js';
 export const fileSystemJobStore: JobStore = {
   createJob,
   getJob,
+  listJobs,
   updateJobPhase,
   recordExtractions,
   failJob,
@@ -44,6 +45,43 @@ async function getJob(jobId: string, jobStorageDirectory: string): Promise<Docum
       throw error;
     }
     throw new InkAgentError(`读取任务失败: ${jobId}`, { cause: error });
+  }
+}
+
+async function listJobs(jobStorageDirectory: string): Promise<readonly DocumentJob[]> {
+  let entries;
+  try {
+    entries = await readdir(jobStorageDirectory, { withFileTypes: true });
+  } catch (error) {
+    if (isMissingPathError(error)) {
+      return [];
+    }
+    throw new InkAgentError(`读取任务目录失败: ${jobStorageDirectory}`, { cause: error });
+  }
+  const jobs = await Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => getJob(entry.name, jobStorageDirectory)),
+  );
+  return sortJobsByUpdatedTime(jobs);
+}
+
+async function sortJobsByUpdatedTime(
+  jobs: readonly DocumentJob[],
+): Promise<readonly DocumentJob[]> {
+  const jobsWithTimes = await Promise.all(
+    jobs.map(async (job) => ({ job, updatedAt: await readJobUpdatedTime(job) })),
+  );
+  return jobsWithTimes
+    .sort((left, right) => right.updatedAt - left.updatedAt)
+    .map(({ job }) => job);
+}
+
+async function readJobUpdatedTime(job: DocumentJob): Promise<number> {
+  try {
+    return (await stat(join(job.workspace.rootDirectory, 'job.json'))).mtimeMs;
+  } catch (error) {
+    throw new InkAgentError(`读取任务更新时间失败: ${job.id}`, { cause: error });
   }
 }
 
@@ -145,4 +183,13 @@ async function writeTextFile(filePath: string, content: string): Promise<void> {
     await rm(temporaryFile, { force: true });
     throw new InkAgentError(`写入任务文件失败: ${filePath}`, { cause: error });
   }
+}
+
+function isMissingPathError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as NodeJS.ErrnoException).code === 'ENOENT'
+  );
 }

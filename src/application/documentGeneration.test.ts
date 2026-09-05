@@ -200,6 +200,9 @@ function createJobStore(events: string[], workspace: DocumentWorkspace): JobStor
     async getJob() {
       return createJob(workspace);
     },
+    async listJobs() {
+      return [];
+    },
     async updateJobPhase({ job, phase }) {
       events.push(phase);
       return { ...job, phase };

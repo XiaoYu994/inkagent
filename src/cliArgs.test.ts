@@ -79,6 +79,13 @@ describe('parseCliArgs', () => {
     });
   });
 
+  it('parses the jobs command', () => {
+    expect(parseCliArgs(['jobs', '--job-directory', './jobs'])).toEqual({
+      kind: 'jobs',
+      jobStorageDirectory: './jobs',
+    });
+  });
+
   it('rejects an unknown thinking level', () => {
     expect(() =>
       parseCliArgs([

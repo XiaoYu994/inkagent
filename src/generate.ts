@@ -85,6 +85,15 @@ export async function readDocumentJob(
   return fileSystemJobStore.getJob(jobId, jobStorageDirectory);
 }
 
+export async function listDocumentJobs(
+  options: Pick<RetryDocumentOptions, 'jobStorageDirectory' | 'projectDirectory'> = {},
+) {
+  const projectDirectory = options.projectDirectory ?? process.cwd();
+  const jobStorageDirectory =
+    options.jobStorageDirectory ?? join(projectDirectory, '.inkagent', 'jobs');
+  return fileSystemJobStore.listJobs(jobStorageDirectory);
+}
+
 async function resolveDocumentAgent(
   options: Pick<GenerateDocumentOptions, 'model' | 'thinkingLevel'>,
   projectDirectory: string,

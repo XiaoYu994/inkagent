@@ -62,4 +62,26 @@ describe('fileSystemJobStore', () => {
       '任务 ID 无效',
     );
   });
+
+  it('lists jobs newest first', async () => {
+    const rootDirectory = await mkdtemp(join(tmpdir(), 'inkagent-job-'));
+    const jobStorageDirectory = join(rootDirectory, 'jobs');
+    await mkdir(jobStorageDirectory);
+    const firstJob = await fileSystemJobStore.createJob({
+      jobStorageDirectory,
+      brief: '第一份',
+      outputDirectory: join(rootDirectory, 'first-output'),
+    });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const secondJob = await fileSystemJobStore.createJob({
+      jobStorageDirectory,
+      brief: '第二份',
+      outputDirectory: join(rootDirectory, 'second-output'),
+    });
+
+    await expect(fileSystemJobStore.listJobs(jobStorageDirectory)).resolves.toEqual([
+      secondJob,
+      firstJob,
+    ]);
+  });
 });

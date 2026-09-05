@@ -41,6 +41,14 @@ node dist/cli.js retry <job-id> --model zai-coding-cn/glm-5.3-flash
 
 `retry` 只复用已持久化且包含可用抽取结果的任务；收集或抽取阶段失败需要重新执行 `generate`。任务记录保存在任务目录的 `job.json`，其中包含目标输出目录，因此恢复时不需要重新提供输出路径。
 
+列出最近任务：
+
+```bash
+node dist/cli.js jobs
+```
+
+结果按任务记录更新时间倒序输出；任务目录尚不存在时返回空数组。
+
 ## 模型选择
 
 模型必须显式指定，**不会**使用本机 Pi 的全局默认模型。优先级：

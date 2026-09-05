@@ -1,5 +1,5 @@
 export { InkAgentError } from './errors.js';
-export { generateDocument, readDocumentJob, retryDocument } from './generate.js';
+export { generateDocument, listDocumentJobs, readDocumentJob, retryDocument } from './generate.js';
 export type {
   GenerateDocumentOptions,
   GenerateDocumentResult,

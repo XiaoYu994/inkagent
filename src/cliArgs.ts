@@ -7,6 +7,7 @@ import type { GenerateDocumentOptions } from './generate.js';
 export type ParsedCliArgs =
   | { kind: 'help'; text: string }
   | { kind: 'models' }
+  | { kind: 'jobs'; jobStorageDirectory?: string }
   | { kind: 'status'; jobId: string; jobStorageDirectory?: string }
   | {
       kind: 'retry';
@@ -25,6 +26,9 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
   if (command === 'models') {
     return parseModelsCommand(rest);
   }
+  if (command === 'jobs') {
+    return parseJobsCommand(rest);
+  }
   if (command === 'status') {
     return parseJobCommand('status', rest);
   }
@@ -32,9 +36,27 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
     return parseRetryCommand(rest);
   }
   if (command !== 'generate') {
-    throw new InkAgentError(invalidWithUsage('第一个参数必须是 generate、models、status 或 retry'));
+    throw new InkAgentError(
+      invalidWithUsage('第一个参数必须是 generate、models、jobs、status 或 retry'),
+    );
   }
   return parseGenerateCommand(rest);
+}
+
+function parseJobsCommand(args: string[]): ParsedCliArgs {
+  const { values, positionals } = parseJobFlags(args);
+  if (values.help) {
+    return { kind: 'help', text: usageText() };
+  }
+  if (positionals.length > 0) {
+    throw new InkAgentError(invalidWithUsage('jobs 不接受额外参数'));
+  }
+  return {
+    kind: 'jobs',
+    ...(values['job-directory'] === undefined
+      ? {}
+      : { jobStorageDirectory: values['job-directory'] as string }),
+  };
 }
 
 function parseJobCommand(command: 'status', args: string[]): ParsedCliArgs {
@@ -209,6 +231,7 @@ function usageText(): string {
     '用法:',
     '  inkagent generate --input-directory <目录> --output-directory <目录> [--model <引用>] <brief>',
     '  inkagent models',
+    '  inkagent jobs [--job-directory <目录>]',
     '  inkagent status [--job-directory <目录>] <job-id>',
     '  inkagent retry [--job-directory <目录>] [--model <引用>] <job-id>',
     '',

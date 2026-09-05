@@ -84,4 +84,20 @@ describe('fileSystemJobStore', () => {
       firstJob,
     ]);
   });
+
+  it('keeps valid jobs visible when another job record is corrupted', async () => {
+    const rootDirectory = await mkdtemp(join(tmpdir(), 'inkagent-job-'));
+    const jobStorageDirectory = join(rootDirectory, 'jobs');
+    await mkdir(jobStorageDirectory);
+    const validJob = await fileSystemJobStore.createJob({
+      jobStorageDirectory,
+      brief: '有效任务',
+      outputDirectory: join(rootDirectory, 'output'),
+    });
+    const corruptedJobDirectory = join(jobStorageDirectory, 'corrupted');
+    await mkdir(corruptedJobDirectory);
+    await writeFile(join(corruptedJobDirectory, 'job.json'), '{not-json');
+
+    await expect(fileSystemJobStore.listJobs(jobStorageDirectory)).resolves.toEqual([validJob]);
+  });
 });

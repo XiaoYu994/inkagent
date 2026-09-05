@@ -61,9 +61,25 @@ async function listJobs(jobStorageDirectory: string): Promise<readonly DocumentJ
   const jobs = await Promise.all(
     entries
       .filter((entry) => entry.isDirectory())
-      .map((entry) => getJob(entry.name, jobStorageDirectory)),
+      .map((entry) => readJobForListing(entry.name, jobStorageDirectory)),
   );
-  return sortJobsByUpdatedTime(jobs);
+  return sortJobsByUpdatedTime(jobs.filter((job): job is DocumentJob => job !== undefined));
+}
+
+async function readJobForListing(
+  jobId: string,
+  jobStorageDirectory: string,
+): Promise<DocumentJob | undefined> {
+  try {
+    return await getJob(jobId, jobStorageDirectory);
+  } catch (error) {
+    reportSkippedJob(jobId, error);
+    return undefined;
+  }
+}
+
+function reportSkippedJob(jobId: string, error: unknown): void {
+  process.stderr.write(`跳过无效任务记录 ${jobId}: ${formatError(error)}\n`);
 }
 
 async function sortJobsByUpdatedTime(

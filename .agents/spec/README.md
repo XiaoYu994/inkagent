@@ -22,6 +22,7 @@
 | [abstraction.md](./abstraction.md) | 数据结构与抽象 | Clean Code 第 6、8、9 章 |
 | [error-handling.md](./error-handling.md) | 错误处理 | Clean Code 第 7 章 |
 | [testing.md](./testing.md) | 测试 | Clean Code 第 9 章、TDD 实践 |
+| [ingest.md](./ingest.md) | 材料抽取（封面、图、表） | 本仓库决策 |
 | [refactoring.md](./refactoring.md) | 重构与代码坏味道 | 《重构》全书 |
 | [branching.md](./branching.md) | 分支与合并 | GitHub Flow |
 | [commits.md](./commits.md) | 提交说明 | Conventional Commits 1.0.0 |

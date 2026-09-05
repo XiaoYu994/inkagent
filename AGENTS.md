@@ -37,6 +37,7 @@
 | 设计类型/模块边界、封装数据、接入第三方、出现链式 `.get().get()` | [abstraction.md](.agents/spec/abstraction.md)       |
 | 抛错、捕获、返回错误、处理空值或缺省                             | [error-handling.md](.agents/spec/error-handling.md) |
 | 写测试、改测试、评审测试；重构前确认保护网                       | [testing.md](.agents/spec/testing.md)               |
+| 改抽取、anydoc 适配、封面/图/表如何进入 agent                    | [ingest.md](.agents/spec/ingest.md)                 |
 | 改既有结构、识别坏味道、加功能前铺路                             | [refactoring.md](.agents/spec/refactoring.md)       |
 | 建分支、开合并请求、发版、热修                                   | [branching.md](.agents/spec/branching.md)           |
 | 写 commit、squash 说明、整理提交历史                             | [commits.md](.agents/spec/commits.md)               |
@@ -58,7 +59,7 @@
 
 ## 构建与测试
 
-- 安装：`npm install`（Node.js 22.13+）
+- 安装：`npm install`（Node.js 22.19+）
 - 类型检查：`npm run typecheck`
 - 测试：`npm test`
 - 构建：`npm run build`

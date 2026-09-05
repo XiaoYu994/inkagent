@@ -69,6 +69,27 @@ describe('fileSystemOutputPublisher', () => {
     ).toBe('image');
   });
 
+  it('allows local references with a fragment or query string', async () => {
+    const rootDirectory = await mkdtemp(join(tmpdir(), 'inkagent-output-'));
+    const sourceDirectory = join(rootDirectory, 'draft');
+    const assetSourceDirectory = join(rootDirectory, 'extract');
+    const targetDirectory = join(rootDirectory, 'published');
+    await mkdir(sourceDirectory);
+    await mkdir(assetSourceDirectory);
+    await writeFile(
+      join(sourceDirectory, 'document.md'),
+      '[续读](appendix.md#details)\n\n![图](extract/image.png?version=2)\n',
+    );
+    await writeFile(join(sourceDirectory, 'appendix.md'), '# 附录\n');
+    await writeFile(join(assetSourceDirectory, 'image.png'), 'image');
+
+    await expect(
+      fileSystemOutputPublisher.publish({ sourceDirectory, targetDirectory, assetSourceDirectory }),
+    ).resolves.toMatchObject({
+      files: ['appendix.md', 'document.md', 'extract/image.png'],
+    });
+  });
+
   it('keeps the previous output when markdown references a missing local file', async () => {
     const rootDirectory = await mkdtemp(join(tmpdir(), 'inkagent-output-'));
     const sourceDirectory = join(rootDirectory, 'draft');

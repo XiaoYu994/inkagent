@@ -186,7 +186,8 @@ async function assertLocalMarkdownReferences(
     if (reference === undefined || isExternalReference(reference)) {
       continue;
     }
-    const targetPath = resolve(dirname(join(sourceDirectory, relativeMarkdownPath)), reference);
+    const localPath = decodeLocalReferencePath(reference, relativeMarkdownPath);
+    const targetPath = resolve(dirname(join(sourceDirectory, relativeMarkdownPath)), localPath);
     if (!isPathInside(targetPath, sourceDirectory)) {
       throw new InkAgentError(
         `Markdown 引用了发布目录之外的本地文件: ${relativeMarkdownPath} -> ${reference}`,
@@ -203,6 +204,17 @@ async function assertLocalMarkdownReferences(
         { cause: error },
       );
     }
+  }
+}
+
+function decodeLocalReferencePath(reference: string, relativeMarkdownPath: string): string {
+  const referencePath = reference.split(/[?#]/, 1)[0] ?? '';
+  try {
+    return decodeURIComponent(referencePath);
+  } catch (error) {
+    throw new InkAgentError(`Markdown 本地引用格式无效: ${relativeMarkdownPath} -> ${reference}`, {
+      cause: error,
+    });
   }
 }
 

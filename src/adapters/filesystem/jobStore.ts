@@ -11,6 +11,7 @@ import type {
   RecordExtractionsRequest,
   UpdateJobPhaseRequest,
 } from '../../application/ports.js';
+import { jobPhases, type JobFailure, type JobPhase } from '../../domain/job.js';
 import { formatError, InkAgentError } from '../../errors.js';
 import { isPathInside } from '../../shared/pathRelationship.js';
 
@@ -121,11 +122,39 @@ function validateStoredJob(
     !isIndependentOutputDirectory(job.outputDirectory, jobStorageDirectory, jobId) ||
     !isExpectedWorkspace(job.workspace, jobStorageDirectory, jobId) ||
     !Array.isArray(job.extractions) ||
-    job.phase === undefined
+    !isValidJobState(job.phase, job.failure, jobId)
   ) {
     throw new InkAgentError(`任务记录格式无效: ${jobId}`);
   }
   return job as DocumentJob;
+}
+
+function isValidJobState(phase: unknown, failure: unknown, jobId: string): phase is JobPhase {
+  if (!isJobPhase(phase)) {
+    throw new InkAgentError(`任务状态无效: ${jobId}`);
+  }
+  if (phase === 'failed') {
+    if (!isJobFailure(failure)) {
+      throw new InkAgentError(`任务失败记录无效: ${jobId}`);
+    }
+    return true;
+  }
+  if (failure !== undefined) {
+    throw new InkAgentError(`任务失败记录无效: ${jobId}`);
+  }
+  return true;
+}
+
+function isJobPhase(value: unknown): value is JobPhase {
+  return typeof value === 'string' && jobPhases.includes(value as JobPhase);
+}
+
+function isJobFailure(value: unknown): value is JobFailure {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const failure = value as Partial<JobFailure>;
+  return isJobPhase(failure.phase) && typeof failure.message === 'string';
 }
 
 function isIndependentOutputDirectory(

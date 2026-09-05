@@ -121,26 +121,33 @@ function validateStoredJob(
     typeof job.id !== 'string' ||
     job.id !== jobId ||
     !isIndependentOutputDirectory(job.outputDirectory, jobStorageDirectory, jobId) ||
-    !isExpectedWorkspace(job.workspace, jobStorageDirectory, jobId) ||
     !Array.isArray(job.extractions) ||
     !isValidJobState(job.phase, job.failure, jobId)
   ) {
     throw new InkAgentError(`任务记录格式无效: ${jobId}`);
   }
-  assertValidExtractions(job.extractions, jobId);
+  const workspace = job.workspace;
+  if (!isExpectedWorkspace(workspace, jobStorageDirectory, jobId)) {
+    throw new InkAgentError(`任务记录格式无效: ${jobId}`);
+  }
+  assertValidExtractions(job.extractions, jobId, workspace);
   return job as DocumentJob;
 }
 
-function assertValidExtractions(extractions: readonly unknown[], jobId: string): void {
+function assertValidExtractions(
+  extractions: readonly unknown[],
+  jobId: string,
+  workspace: DocumentWorkspace,
+): void {
   extractions.forEach((extraction, index) => {
     if (!isRecord(extraction) || !isSourceKind(extraction.kind)) {
       throw new InkAgentError(`任务抽取记录无效: ${jobId} [${index}]`);
     }
-    if (typeof extraction.sourcePath !== 'string' || extraction.sourcePath.length === 0) {
+    if (!isWorkspaceRelativePath(extraction.sourcePath, workspace.inputDirectory)) {
       throw new InkAgentError(`任务抽取记录无效: ${jobId} [${index}]`);
     }
     if (extraction.status === 'ok') {
-      if (typeof extraction.extractedPath !== 'string' || extraction.extractedPath.length === 0) {
+      if (!isWorkspaceRelativePath(extraction.extractedPath, workspace.extractionDirectory)) {
         throw new InkAgentError(`任务抽取记录无效: ${jobId} [${index}]`);
       }
       return;
@@ -153,6 +160,14 @@ function assertValidExtractions(extractions: readonly unknown[], jobId: string):
       throw new InkAgentError(`任务抽取记录无效: ${jobId} [${index}]`);
     }
   });
+}
+
+function isWorkspaceRelativePath(path: unknown, workspaceDirectory: string): path is string {
+  return (
+    typeof path === 'string' &&
+    path.length > 0 &&
+    isPathInside(resolve(workspaceDirectory, path), workspaceDirectory)
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

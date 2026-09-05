@@ -145,6 +145,27 @@ describe('fileSystemJobStore', () => {
     await expect(readFile(job.workspace.briefFile, 'utf8')).resolves.toBe('重新生成\n');
   });
 
+  it('resumes a failed job without keeping its previous failure', async () => {
+    const rootDirectory = await mkdtemp(join(tmpdir(), 'inkagent-job-'));
+    const createdJob = await fileSystemJobStore.createJob({
+      jobStorageDirectory: join(rootDirectory, 'jobs'),
+      brief: '重新生成',
+      outputDirectory: join(rootDirectory, 'output'),
+    });
+    const failedJob = await fileSystemJobStore.failJob({
+      job: { ...createdJob, phase: 'generating' },
+      error: new Error('模型失败'),
+    });
+
+    const resumedJob = await fileSystemJobStore.resumeGenerating(failedJob);
+
+    expect(resumedJob).toMatchObject({ id: createdJob.id, phase: 'generating' });
+    expect(resumedJob.failure).toBeUndefined();
+    await expect(
+      fileSystemJobStore.getJob(resumedJob.id, join(rootDirectory, 'jobs')),
+    ).resolves.toEqual(resumedJob);
+  });
+
   it('lists jobs newest first', async () => {
     const rootDirectory = await mkdtemp(join(tmpdir(), 'inkagent-job-'));
     const jobStorageDirectory = join(rootDirectory, 'jobs');

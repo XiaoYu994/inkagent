@@ -19,6 +19,7 @@ export const fileSystemJobStore: JobStore = {
   getJob,
   listJobs,
   updateJobPhase,
+  resumeGenerating,
   clearDraft,
   recordExtractions,
   failJob,
@@ -170,6 +171,13 @@ async function updateJobPhase(request: UpdateJobPhaseRequest): Promise<DocumentJ
   const job = { ...request.job, phase: request.phase };
   await writeJobFile(job);
   return job;
+}
+
+async function resumeGenerating(job: DocumentJob): Promise<DocumentJob> {
+  const resumedJob: DocumentJob = { ...job, phase: 'generating' };
+  delete resumedJob.failure;
+  await writeJobFile(resumedJob);
+  return resumedJob;
 }
 
 async function clearDraft(job: DocumentJob): Promise<void> {

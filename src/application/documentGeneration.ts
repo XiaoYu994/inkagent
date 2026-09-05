@@ -172,7 +172,7 @@ async function retryDocument(
   assertRetryableJob(job);
   try {
     if (job.failure?.phase === 'generating') {
-      job = await dependencies.jobStore.updateJobPhase({ job, phase: 'generating' });
+      job = await dependencies.jobStore.resumeGenerating(job);
       await dependencies.jobStore.clearDraft(job);
       await dependencies.documentAgent.generate(job.workspace);
     }

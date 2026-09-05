@@ -168,8 +168,9 @@ describe('createDocumentGeneration', () => {
     const result = await generation.execute({ jobId: 'job-1', jobStorageDirectory: '/jobs' });
 
     expect(result.job.phase).toBe('succeeded');
+    expect(result.job.failure).toBeUndefined();
     expect(events).toEqual([
-      'generating',
+      'resume-generating',
       'clear-draft',
       'generate',
       'publishing',
@@ -213,6 +214,12 @@ function createJobStore(events: string[], workspace: DocumentWorkspace): JobStor
     async updateJobPhase({ job, phase }) {
       events.push(phase);
       return { ...job, phase };
+    },
+    async resumeGenerating(job) {
+      events.push('resume-generating');
+      const resumedJob = { ...job, phase: 'generating' as const };
+      delete resumedJob.failure;
+      return resumedJob;
     },
     async clearDraft() {
       events.push('clear-draft');

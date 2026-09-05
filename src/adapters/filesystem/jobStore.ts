@@ -1,5 +1,5 @@
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 import type {
@@ -31,7 +31,7 @@ async function createJob(request: CreateJobRequest): Promise<DocumentJob> {
   await writeTextFile(workspace.briefFile, `${request.brief}\n`);
 
   const job = createJobRecord(jobId, workspace);
-  const jobWithOutput = { ...job, outputDirectory: request.outputDirectory };
+  const jobWithOutput = { ...job, outputDirectory: resolve(request.outputDirectory) };
   await writeJobFile(jobWithOutput);
   return jobWithOutput;
 }
@@ -217,7 +217,7 @@ function createJobRecord(
 }
 
 function createWorkspace(parentDirectory: string, jobId: string): DocumentWorkspace {
-  const rootDirectory = join(parentDirectory, jobId);
+  const rootDirectory = resolve(parentDirectory, jobId);
   return {
     rootDirectory,
     inputDirectory: join(rootDirectory, 'input'),

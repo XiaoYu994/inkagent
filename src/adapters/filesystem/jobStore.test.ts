@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
@@ -44,6 +44,23 @@ describe('fileSystemJobStore', () => {
     await expect(fileSystemJobStore.getJob(job.id, jobStorageDirectory)).resolves.toEqual(
       failedJob,
     );
+  });
+
+  it('persists absolute workspace and output paths from relative requests', async () => {
+    const rootDirectory = await mkdtemp(join(tmpdir(), 'inkagent-job-'));
+    const jobStorageDirectory = join(rootDirectory, 'jobs');
+    const outputDirectory = join(rootDirectory, 'output');
+    const job = await fileSystemJobStore.createJob({
+      jobStorageDirectory: relative(process.cwd(), jobStorageDirectory),
+      brief: '写一份说明',
+      outputDirectory: relative(process.cwd(), outputDirectory),
+    });
+
+    expect(job.workspace.rootDirectory).toBe(join(jobStorageDirectory, job.id));
+    expect(job.outputDirectory).toBe(outputDirectory);
+    await expect(
+      fileSystemJobStore.getJob(job.id, relative(process.cwd(), jobStorageDirectory)),
+    ).resolves.toEqual(job);
   });
 
   it('rejects a legacy job without an output directory', async () => {

@@ -40,7 +40,7 @@ async function getJob(jobId: string, jobStorageDirectory: string): Promise<Docum
   const jobFile = join(jobStorageDirectory, jobId, 'job.json');
   try {
     const job = JSON.parse(await readFile(jobFile, 'utf8')) as Partial<DocumentJob>;
-    return validateStoredJob(job, jobId);
+    return validateStoredJob(job, jobId, jobStorageDirectory);
   } catch (error) {
     if (error instanceof InkAgentError) {
       throw error;
@@ -108,18 +108,44 @@ function assertSafeJobId(jobId: string): void {
   }
 }
 
-function validateStoredJob(job: Partial<DocumentJob>, jobId: string): DocumentJob {
+function validateStoredJob(
+  job: Partial<DocumentJob>,
+  jobId: string,
+  jobStorageDirectory: string,
+): DocumentJob {
   if (
     typeof job.id !== 'string' ||
     job.id !== jobId ||
     typeof job.outputDirectory !== 'string' ||
-    job.workspace === undefined ||
+    !isExpectedWorkspace(job.workspace, jobStorageDirectory, jobId) ||
     !Array.isArray(job.extractions) ||
     job.phase === undefined
   ) {
     throw new InkAgentError(`任务记录格式无效: ${jobId}`);
   }
   return job as DocumentJob;
+}
+
+function isExpectedWorkspace(
+  workspace: DocumentWorkspace | undefined,
+  jobStorageDirectory: string,
+  jobId: string,
+): workspace is DocumentWorkspace {
+  if (workspace === undefined) {
+    return false;
+  }
+  const expectedWorkspace = createWorkspace(jobStorageDirectory, jobId);
+  if (
+    workspace.rootDirectory === expectedWorkspace.rootDirectory &&
+    workspace.inputDirectory === expectedWorkspace.inputDirectory &&
+    workspace.extractionDirectory === expectedWorkspace.extractionDirectory &&
+    workspace.draftDirectory === expectedWorkspace.draftDirectory &&
+    workspace.briefFile === expectedWorkspace.briefFile &&
+    workspace.manifestFile === expectedWorkspace.manifestFile
+  ) {
+    return true;
+  }
+  throw new InkAgentError(`任务工作区无效: ${jobId}`);
 }
 
 async function updateJobPhase(request: UpdateJobPhaseRequest): Promise<DocumentJob> {

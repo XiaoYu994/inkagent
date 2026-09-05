@@ -57,6 +57,29 @@ describe('fileSystemJobStore', () => {
     );
   });
 
+  it('rejects a job whose workspace does not match its storage location', async () => {
+    const rootDirectory = await mkdtemp(join(tmpdir(), 'inkagent-job-'));
+    const jobStorageDirectory = join(rootDirectory, 'jobs');
+    const job = await fileSystemJobStore.createJob({
+      jobStorageDirectory,
+      brief: '生成文档',
+      outputDirectory: join(rootDirectory, 'output'),
+    });
+    const jobFile = join(job.workspace.rootDirectory, 'job.json');
+    const storedJob = JSON.parse(await readFile(jobFile, 'utf8'));
+    await writeFile(
+      jobFile,
+      JSON.stringify({
+        ...storedJob,
+        workspace: { ...storedJob.workspace, draftDirectory: join(rootDirectory, 'outside') },
+      }),
+    );
+
+    await expect(fileSystemJobStore.getJob(job.id, jobStorageDirectory)).rejects.toThrow(
+      '任务工作区无效',
+    );
+  });
+
   it('rejects a job id that escapes the storage directory', async () => {
     await expect(fileSystemJobStore.getJob('../outside', '/tmp/jobs')).rejects.toThrow(
       '任务 ID 无效',

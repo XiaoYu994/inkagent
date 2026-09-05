@@ -3,6 +3,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 
 import { InkAgentError, isEnoentError } from '../../errors.js';
 import { defaultInputResourceLimits, type InputResourceLimits } from '../../application/ports.js';
+import { isPathInside } from '../../shared/pathRelationship.js';
 
 type TreeFile = {
   sourcePath: string;
@@ -193,6 +194,11 @@ async function assertLocalMarkdownReferences(
       continue;
     }
     const targetPath = resolve(dirname(join(sourceDirectory, relativeMarkdownPath)), reference);
+    if (!isPathInside(targetPath, sourceDirectory)) {
+      throw new InkAgentError(
+        `Markdown 引用了发布目录之外的本地文件: ${relativeMarkdownPath} -> ${reference}`,
+      );
+    }
     try {
       const targetStats = await stat(targetPath);
       if (!targetStats.isFile()) {

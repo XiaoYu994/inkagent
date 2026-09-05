@@ -83,4 +83,20 @@ describe('fileSystemOutputPublisher', () => {
     ).rejects.toThrow('引用了不存在的本地文件');
     expect(await readFile(join(targetDirectory, 'previous.md'), 'utf8')).toBe('# 保留\n');
   });
+
+  it('rejects markdown references that escape the published directory', async () => {
+    const rootDirectory = await mkdtemp(join(tmpdir(), 'inkagent-output-'));
+    const sourceDirectory = join(rootDirectory, 'draft');
+    const targetDirectory = join(rootDirectory, 'published');
+    await mkdir(sourceDirectory);
+    await mkdir(targetDirectory);
+    await writeFile(join(rootDirectory, 'secret.txt'), 'secret');
+    await writeFile(join(sourceDirectory, 'document.md'), '![机密](../secret.txt)\n');
+    await writeFile(join(targetDirectory, 'previous.md'), '# 保留\n');
+
+    await expect(
+      fileSystemOutputPublisher.publish({ sourceDirectory, targetDirectory }),
+    ).rejects.toThrow('引用了发布目录之外的本地文件');
+    expect(await readFile(join(targetDirectory, 'previous.md'), 'utf8')).toBe('# 保留\n');
+  });
 });

@@ -18,6 +18,7 @@ export type {
   DocumentWorkspace,
   GenerationDirectoryValidator,
   InputResourceLimits,
+  JobLock,
   JobStore,
   MaterialCollector,
   MaterialExtractor,

@@ -50,6 +50,10 @@ export type FailJobRequest = {
   error: unknown;
 };
 
+export type JobLock = {
+  release(): Promise<void>;
+};
+
 export type JobStore = {
   createJob(request: CreateJobRequest): Promise<DocumentJob>;
   getJob(jobId: string, jobStorageDirectory: string): Promise<DocumentJob>;
@@ -59,6 +63,7 @@ export type JobStore = {
   clearDraft(job: DocumentJob): Promise<void>;
   recordExtractions(request: RecordExtractionsRequest): Promise<DocumentJob>;
   failJob(request: FailJobRequest): Promise<DocumentJob>;
+  acquireJobLock(job: DocumentJob): Promise<JobLock>;
 };
 
 export type CollectMaterialsRequest = {

@@ -192,15 +192,86 @@ describe('createDocumentGeneration', () => {
     expect(result.job.phase).toBe('succeeded');
     expect(result.job.failure).toBeUndefined();
     expect(events).toEqual([
+      'acquire-job-lock',
       'resume-generating',
       'clear-draft',
       'generate',
       'publishing',
       'publish',
       'succeeded',
+      'release-job-lock',
     ]);
   });
+
+  it('allows only one concurrent retry to hold a job lock', async () => {
+    const failedJob = {
+      ...createJob(createWorkspace()),
+      phase: 'failed' as const,
+      extractions: [
+        {
+          sourcePath: 'notes.md',
+          kind: 'markdown' as const,
+          status: 'ok' as const,
+          extractedPath: 'markdown/notes.md',
+        },
+      ],
+      failure: { phase: 'publishing' as const, message: '发布失败' },
+    };
+    let locked = false;
+    const publicationGate = createDeferred<void>();
+    const publicationStarted = createDeferred<void>();
+    const events: string[] = [];
+    const generation = createDocumentRetry({
+      directoryValidator: createDirectoryValidator([]),
+      jobStore: {
+        ...createJobStore(events, failedJob.workspace),
+        async getJob() {
+          return failedJob;
+        },
+        async acquireJobLock() {
+          if (locked) {
+            throw new Error(`任务 ${failedJob.id} 正在执行恢复`);
+          }
+          locked = true;
+          return {
+            async release() {
+              locked = false;
+            },
+          };
+        },
+      },
+      materialCollector: createMaterialCollector([]),
+      materialExtractor: createMaterialExtractor([]),
+      documentAgent: { async generate() {} },
+      outputPublisher: {
+        async publish() {
+          publicationStarted.resolve();
+          await publicationGate.promise;
+          return { files: ['document.md'] };
+        },
+      },
+    });
+
+    const firstRetry = generation.execute({ jobId: 'job-1', jobStorageDirectory: '/jobs' });
+    await publicationStarted.promise;
+
+    await expect(
+      generation.execute({ jobId: 'job-1', jobStorageDirectory: '/jobs' }),
+    ).rejects.toThrow('正在执行恢复');
+    expect(events).not.toContain('failed');
+
+    publicationGate.resolve();
+    await expect(firstRetry).resolves.toMatchObject({ job: { phase: 'succeeded' } });
+  });
 });
+
+function createDeferred<T>(): { promise: Promise<T>; resolve(value: T): void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
 
 function createWorkspace(): DocumentWorkspace {
   return {
@@ -256,6 +327,14 @@ function createJobStore(events: string[], workspace: DocumentWorkspace): JobStor
         ...job,
         phase: 'failed' as const,
         failure: { phase: job.phase, message: '失败' },
+      };
+    },
+    async acquireJobLock() {
+      events.push('acquire-job-lock');
+      return {
+        async release() {
+          events.push('release-job-lock');
+        },
       };
     },
   };

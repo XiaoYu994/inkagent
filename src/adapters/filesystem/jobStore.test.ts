@@ -242,6 +242,38 @@ describe('fileSystemJobStore', () => {
     ).resolves.toEqual(resumedJob);
   });
 
+  it('prevents concurrent retry locks and allows reuse after release', async () => {
+    const rootDirectory = await mkdtemp(join(tmpdir(), 'inkagent-job-'));
+    const job = await fileSystemJobStore.createJob({
+      jobStorageDirectory: join(rootDirectory, 'jobs'),
+      brief: '重新生成',
+      outputDirectory: join(rootDirectory, 'output'),
+    });
+    const lock = await fileSystemJobStore.acquireJobLock(job);
+
+    await expect(fileSystemJobStore.acquireJobLock(job)).rejects.toThrow(
+      `任务 ${job.id}正在被另一个任务使用`,
+    );
+    await lock.release();
+
+    const nextLock = await fileSystemJobStore.acquireJobLock(job);
+    await nextLock.release();
+  });
+
+  it('recovers a retry lock left by a process that no longer exists', async () => {
+    const rootDirectory = await mkdtemp(join(tmpdir(), 'inkagent-job-'));
+    const job = await fileSystemJobStore.createJob({
+      jobStorageDirectory: join(rootDirectory, 'jobs'),
+      brief: '重新生成',
+      outputDirectory: join(rootDirectory, 'output'),
+    });
+    await writeFile(join(job.workspace.rootDirectory, '.retry.inkagent.lock'), '999999999\n');
+
+    const lock = await fileSystemJobStore.acquireJobLock(job);
+
+    await lock.release();
+  });
+
   it('lists jobs newest first', async () => {
     const rootDirectory = await mkdtemp(join(tmpdir(), 'inkagent-job-'));
     const jobStorageDirectory = join(rootDirectory, 'jobs');

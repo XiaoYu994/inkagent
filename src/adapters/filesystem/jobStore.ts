@@ -13,6 +13,7 @@ import type {
 } from '../../application/ports.js';
 import { formatError, InkAgentError } from '../../errors.js';
 import { assertSafeJobId, validateStoredJob } from './jobRecordValidation.js';
+import { acquireJobLock } from './jobLock.js';
 
 export const fileSystemJobStore: JobStore = {
   createJob,
@@ -23,6 +24,7 @@ export const fileSystemJobStore: JobStore = {
   clearDraft,
   recordExtractions,
   failJob,
+  acquireJobLock,
 };
 
 async function createJob(request: CreateJobRequest): Promise<DocumentJob> {

@@ -176,6 +176,22 @@ async function retryDocument(
   dependencies: DocumentGenerationDependencies,
   request: RetryDocumentRequest,
 ): Promise<GenerateDocumentResult> {
+  const requestedJob = await dependencies.jobStore.getJob(
+    request.jobId,
+    request.jobStorageDirectory,
+  );
+  const jobLock = await dependencies.jobStore.acquireJobLock(requestedJob);
+  try {
+    return await retryLockedDocument(dependencies, request);
+  } finally {
+    await jobLock.release();
+  }
+}
+
+async function retryLockedDocument(
+  dependencies: DocumentGenerationDependencies,
+  request: RetryDocumentRequest,
+): Promise<GenerateDocumentResult> {
   let job = await dependencies.jobStore.getJob(request.jobId, request.jobStorageDirectory);
   assertRetryableJob(job);
   try {

@@ -17,11 +17,13 @@ export type {
   DocumentAgent,
   DocumentWorkspace,
   GenerationDirectoryValidator,
+  InputResourceLimits,
   JobStore,
   MaterialCollector,
   MaterialExtractor,
   OutputPublisher,
 } from './application/ports.js';
+export { defaultInputResourceLimits } from './application/ports.js';
 export type { DocumentJob } from './application/ports.js';
 export type { JobPhase, JobFailure } from './domain/job.js';
 export { detectSourceKind } from './ingest/sourceKind.js';

@@ -71,11 +71,11 @@ export type InputResourceLimits = {
   maxTotalBytes: number;
 };
 
-export const defaultInputResourceLimits: InputResourceLimits = {
+export const defaultInputResourceLimits = Object.freeze({
   maxFiles: 1000,
   maxFileBytes: 50 * 1024 * 1024,
   maxTotalBytes: 200 * 1024 * 1024,
-};
+}) satisfies Readonly<InputResourceLimits>;
 
 export type MaterialCollector = {
   collect(request: CollectMaterialsRequest): Promise<readonly SourceFile[]>;

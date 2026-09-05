@@ -55,6 +55,7 @@ export type JobStore = {
   getJob(jobId: string, jobStorageDirectory: string): Promise<DocumentJob>;
   listJobs(jobStorageDirectory: string): Promise<readonly DocumentJob[]>;
   updateJobPhase(request: UpdateJobPhaseRequest): Promise<DocumentJob>;
+  clearDraft(job: DocumentJob): Promise<void>;
   recordExtractions(request: RecordExtractionsRequest): Promise<DocumentJob>;
   failJob(request: FailJobRequest): Promise<DocumentJob>;
 };

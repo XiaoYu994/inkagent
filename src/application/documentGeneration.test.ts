@@ -168,7 +168,14 @@ describe('createDocumentGeneration', () => {
     const result = await generation.execute({ jobId: 'job-1', jobStorageDirectory: '/jobs' });
 
     expect(result.job.phase).toBe('succeeded');
-    expect(events).toEqual(['generating', 'generate', 'publishing', 'publish', 'succeeded']);
+    expect(events).toEqual([
+      'generating',
+      'clear-draft',
+      'generate',
+      'publishing',
+      'publish',
+      'succeeded',
+    ]);
   });
 });
 
@@ -206,6 +213,9 @@ function createJobStore(events: string[], workspace: DocumentWorkspace): JobStor
     async updateJobPhase({ job, phase }) {
       events.push(phase);
       return { ...job, phase };
+    },
+    async clearDraft() {
+      events.push('clear-draft');
     },
     async recordExtractions({ job, extractions }) {
       events.push('record-extractions');

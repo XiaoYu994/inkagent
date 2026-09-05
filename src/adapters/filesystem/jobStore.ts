@@ -18,6 +18,7 @@ export const fileSystemJobStore: JobStore = {
   getJob,
   listJobs,
   updateJobPhase,
+  clearDraft,
   recordExtractions,
   failJob,
 };
@@ -125,6 +126,15 @@ async function updateJobPhase(request: UpdateJobPhaseRequest): Promise<DocumentJ
   const job = { ...request.job, phase: request.phase };
   await writeJobFile(job);
   return job;
+}
+
+async function clearDraft(job: DocumentJob): Promise<void> {
+  try {
+    await rm(job.workspace.draftDirectory, { recursive: true, force: true });
+    await mkdir(job.workspace.draftDirectory, { recursive: true });
+  } catch (error) {
+    throw new InkAgentError(`清理任务草稿失败: ${job.id}`, { cause: error });
+  }
 }
 
 async function recordExtractions(request: RecordExtractionsRequest): Promise<DocumentJob> {

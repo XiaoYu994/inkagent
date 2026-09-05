@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -61,6 +61,28 @@ describe('fileSystemJobStore', () => {
     await expect(fileSystemJobStore.getJob('../outside', '/tmp/jobs')).rejects.toThrow(
       '任务 ID 无效',
     );
+  });
+
+  it('clears a job draft without removing its workspace', async () => {
+    const rootDirectory = await mkdtemp(join(tmpdir(), 'inkagent-job-'));
+    const job = await fileSystemJobStore.createJob({
+      jobStorageDirectory: join(rootDirectory, 'jobs'),
+      brief: '重新生成',
+      outputDirectory: join(rootDirectory, 'output'),
+    });
+    await writeFile(join(job.workspace.draftDirectory, 'stale.md'), '# 旧草稿\n');
+
+    await fileSystemJobStore.clearDraft(job);
+
+    await expect(stat(job.workspace.draftDirectory)).resolves.toMatchObject({
+      isDirectory: expect.any(Function),
+    });
+    await expect(
+      readFile(join(job.workspace.draftDirectory, 'stale.md'), 'utf8'),
+    ).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    await expect(readFile(job.workspace.briefFile, 'utf8')).resolves.toBe('重新生成\n');
   });
 
   it('lists jobs newest first', async () => {

@@ -98,6 +98,28 @@ describe('createDocumentGeneration', () => {
     expect(events).toContain('failed');
   });
 
+  it('rejects an empty directory path before validating or creating a job', async () => {
+    const events: string[] = [];
+    const generation = createDocumentGeneration({
+      directoryValidator: createDirectoryValidator(events),
+      jobStore: createJobStore(events, createWorkspace()),
+      materialCollector: createMaterialCollector(events),
+      materialExtractor: createMaterialExtractor(events),
+      documentAgent: { async generate() {} },
+      outputPublisher: createOutputPublisher(events),
+    });
+
+    await expect(
+      generation.execute({
+        inputDirectory: '/input',
+        outputDirectory: '',
+        jobStorageDirectory: '/jobs',
+        brief: '写文档',
+      }),
+    ).rejects.toThrow('输出目录不能为空');
+    expect(events).toEqual([]);
+  });
+
   it('keeps the original error when recording the failure also fails', async () => {
     const originalError = new Error('模型调用失败');
     const generation = createDocumentGeneration({

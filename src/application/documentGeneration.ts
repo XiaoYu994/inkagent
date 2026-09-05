@@ -40,6 +40,16 @@ export type DocumentGeneration = {
   execute(request: GenerateDocumentRequest): Promise<GenerateDocumentResult>;
 };
 
+export function assertValidGenerateDocumentRequest(request: GenerateDocumentRequest): void {
+  requireBrief(request.brief);
+  requireDirectoryPath(request.inputDirectory, '输入目录');
+  requireDirectoryPath(request.outputDirectory, '输出目录');
+  requireDirectoryPath(request.jobStorageDirectory, '任务目录');
+  if (request.inputLimits !== undefined) {
+    assertValidInputResourceLimits(request.inputLimits);
+  }
+}
+
 export function createDocumentGeneration(
   dependencies: DocumentGenerationDependencies,
 ): DocumentGeneration {
@@ -66,10 +76,8 @@ class DocumentGenerationRun {
   }
 
   private async run(): Promise<GenerateDocumentResult> {
-    const brief = requireBrief(this.request.brief);
-    if (this.request.inputLimits !== undefined) {
-      assertValidInputResourceLimits(this.request.inputLimits);
-    }
+    assertValidGenerateDocumentRequest(this.request);
+    const brief = this.request.brief.trim();
     await this.dependencies.directoryValidator.validate(this.request);
     this.currentJob = await this.dependencies.jobStore.createJob({
       jobStorageDirectory: this.request.jobStorageDirectory,
@@ -211,11 +219,18 @@ function assertRetryableJob(job: DocumentJob): void {
 }
 
 function requireBrief(brief: string): string {
-  const normalizedBrief = brief.trim();
+  const normalizedBrief = typeof brief === 'string' ? brief.trim() : '';
   if (normalizedBrief.length === 0) {
     throw new InkAgentError('brief 不能为空');
   }
   return normalizedBrief;
+}
+
+function requireDirectoryPath(path: string, label: string): string {
+  if (typeof path !== 'string' || path.trim().length === 0) {
+    throw new InkAgentError(`${label}不能为空`);
+  }
+  return path;
 }
 
 function assertMaterialsUsable(extractions: readonly MaterialExtraction[]): void {

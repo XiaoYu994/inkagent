@@ -12,6 +12,18 @@ import {
 } from './officeFixtures.js';
 
 describe('extractSourceFiles', () => {
+  it('rejects source paths that escape the input directory', async () => {
+    const { inputDirectory, extractionDirectory } = await createDirectories();
+
+    await expect(
+      extractSourceFiles({
+        inputDirectory,
+        extractionDirectory,
+        sourceFiles: [{ relativePath: '../../outside.txt' }],
+      }),
+    ).rejects.toThrow('材料路径无效');
+  });
+
   it('keeps a .markdown source name without appending another .md', async () => {
     const { inputDirectory, extractionDirectory } = await createDirectories();
     await writeFile(join(inputDirectory, 'notes.markdown'), '# Title\n\nbody\n');

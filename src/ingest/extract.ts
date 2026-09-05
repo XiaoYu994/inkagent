@@ -1,8 +1,9 @@
 import { mkdir, readFile, writeFile, cp } from 'node:fs/promises';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 
-import { formatError } from '../errors.js';
+import { formatError, InkAgentError } from '../errors.js';
 import type { MaterialExtraction, SourceFile, SourceKind } from '../domain/material.js';
+import { isPathInside } from '../shared/pathRelationship.js';
 import { convertOfficeDocument, convertPdfToMarkdown, type ConvertedAsset } from './anydoc.js';
 import { detectSourceKind, isAnydocKind } from './sourceKind.js';
 
@@ -17,11 +18,25 @@ export type ExtractSourceFilesRequest = {
 export async function extractSourceFiles(
   request: ExtractSourceFilesRequest,
 ): Promise<MaterialExtraction[]> {
+  assertSourceFilesInsideInput(request);
   const records: MaterialExtraction[] = [];
   for (const sourceFile of request.sourceFiles) {
     records.push(await extractOneFile(request, sourceFile));
   }
   return records;
+}
+
+function assertSourceFilesInsideInput(request: ExtractSourceFilesRequest): void {
+  for (const sourceFile of request.sourceFiles) {
+    const sourcePath = sourceFile.relativePath;
+    if (
+      typeof sourcePath !== 'string' ||
+      sourcePath.trim().length === 0 ||
+      !isPathInside(resolve(request.inputDirectory, sourcePath), request.inputDirectory)
+    ) {
+      throw new InkAgentError(`材料路径无效: ${sourcePath}`);
+    }
+  }
 }
 
 async function extractOneFile(
